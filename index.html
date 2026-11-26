@@ -410,11 +410,7 @@ function furnish(room){
     slot([addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'))], { ids:['ArmChair_01','GreenChair_01'], x:hw - 1.1, z:hd - 1.2, rot:Math.atan2(-(hw - 1.1), -(hd - 1.2)), h:1.05 });
     lamp(-hw + 1.2, 2.3, 0, T.light); lamp(hw - 1.4, 2.3, hd - 1.4, T.light); lamp(0, 1.25, -.4, '#ffb766', 4);
   } else if(theme === 'kitchen'){
-    for(const sx of [1, -1]){ const cx = sx * (hw / 2 + .2); slot([addBox(cx, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')), addBox(cx, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'))], { kw:['counter','sideboard','dresser'], ids:['GothicCommode_01'], x:cx, z:-hd, back:[0, 1], rot:0, h:.945, span:hw - 1.6 }); }
-    slot([addBox(0, .45, 0, 1.8, .9, .9, std('#8b5e3c')), addBox(0, .92, 0, 2, .05, 1.05, std('#d8cbb0'))], { ids:['ClassicConsole_01','WoodenTable_03'], x:0, z:0, rot:0, h:.945 });
-    addBox(-hw / 2 - .2, 1.75, -hd + .16, hw - 1.8, .05, .3, std('#8b5e3c'), { collide:false });
-    slot([addBox(hw - .5, 1, hd - 1.4, .8, 2, .8, std('#d9d6cf'))], { kw:['fridge','refrigerator'], ids:['Shelf_01'], x:hw, z:hd - 1.4, back:[-1, 0], rot:-Math.PI / 2, h:2 });
-    lamp(0, 2.4, 0, T.light, 12); lamp(-hw + 1.5, 2.4, hd - 1.5, T.light, 7);
+    kitchen(room, slot, lamp);
   } else if(theme === 'gallery'){
     for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]) slot([addBox(x, .5, z, .6, 1, .6, std('#f5f2ec'))], { kw:['plinth','pedestal'], x, z, rot:0, h:1 });
     slot([addBox(0, .23, 0, 1.8, .46, .5, std('#3b3a38'))], { kw:['bench'], ids:['Ottoman_01'], x:0, z:0, rot:0, h:.5 });
@@ -433,6 +429,66 @@ function furnish(room){
   }
 }
 
+
+/* A fitted kitchen: base and wall cabinets, sink with tap, stove with hood, fridge, island with stools. */
+function kitchen(room, slot, lamp){
+  const { w, d, h } = room, hw = w / 2, hd = d / 2, T = THEMES.kitchen, TOP = .945;
+  const paint = std('#4f6b66', { roughness:.6 }), door = std('#587872', { roughness:.55 }), white = std('#eeeae0', { roughness:.6 }), wdoor = std('#f7f4ec', { roughness:.5 });
+  const top = std('#d9d2c3', { roughness:.35 }), steel = std('#c3c7ca', { roughness:.3, metalness:.25 }), grip = std('#8d9296', { roughness:.35, metalness:.3 }), dark = std('#1d1f22', { roughness:.4 }), wood = std('#9a6b3f');
+  const tileTex = canvasTex(128, 128, (g, W, H) => { g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, W, H); g.strokeStyle = '#cbc3b2'; g.lineWidth = 3; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(-32, 64, 64, 64); g.strokeRect(32, 64, 64, 64); g.strokeRect(96, 64, 64, 64); });
+  const deco = { collide:false, pick:false };
+  const cyl = (x, y, z, r, hh, mat, seg = 16) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, hh, seg), mat); m.position.set(x, y, z); roomGroup.add(m); return m; };
+  const base = (x0, x1, bodyH = .8) => { const len = x1 - x0, cx = (x0 + x1) / 2, z = -hd + .3; if(len < .1) return;
+    addBox(cx, .05, z + .03, len, .1, .5, dark, { pick:false }); addBox(cx, .1 + bodyH / 2, z, len, bodyH, .6, paint);
+    const n = Math.max(1, Math.round(len / .5)), dw = len / n;
+    for(let i = 0; i < n; i++){ const x = x0 + dw * (i + .5); addBox(x, .1 + bodyH / 2, z + .305, dw - .04, bodyH - .08, .02, door, deco); addBox(x, bodyH - .02, z + .33, .16, .02, .02, grip, deco); } };
+  const counter = (x0, x1, zc = -hd + .31, dz = .66) => { if(x1 - x0 > .02) addBox((x0 + x1) / 2, TOP - .0225, zc, x1 - x0, .045, dz, top, { collide:false }); };
+  const uppers = (x0, x1) => { const len = x1 - x0, cx = (x0 + x1) / 2, z = -hd + .18; if(len < .3) return;
+    addBox(cx, 1.87, z, len, .72, .36, white, { collide:false });
+    const n = Math.max(1, Math.round(len / .5)), dw = len / n;
+    for(let i = 0; i < n; i++){ const x = x0 + dw * (i + .5); addBox(x, 1.87, z + .185, dw - .04, .66, .02, wdoor, deco); addBox(x + (i % 2 ? -1 : 1) * (dw / 2 - .08), 1.6, z + .2, .02, .14, .02, grip, deco); }
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(len - .1, .015, .05), new THREE.MeshBasicMaterial({ color:'#fff2cf' })); glow.position.set(cx, 1.5, z + .1); roomGroup.add(glow); };
+  const splash = (x0, x1) => { const t = tileTex.clone(); t.repeat.set((x1 - x0) / .3, 2); t.needsUpdate = true; const p = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, .57), std('#ffffff', { map:t, roughness:.25 })); p.position.set((x0 + x1) / 2, TOP + .285, -hd + .012); roomGroup.add(p); };
+  const prop = (x, z, rot = 0) => slot([], { prop:true, x, z, y:TOP, rot });
+
+  /* right run: sink under a window */
+  const R0 = 1.0, R1 = hw - .05, sx = (R0 + R1) / 2, halfR = (R1 - R0) / 2;
+  base(R0, sx - .3); base(sx + .3, R1); addBox(sx, .4, -hd + .3, .6, .6, .6, paint); addBox(sx, .42, -hd + .605, .56, .52, .02, door, deco);
+  counter(R0, sx - .28); counter(sx + .28, R1); counter(sx - .28, sx + .28, -hd + .06, .16); counter(sx - .28, sx + .28, -hd + .58, .12);
+  addBox(sx, TOP - .2, -hd + .33, .56, .02, .38, steel, deco);
+  for(const [x, z, ww, dd] of [[sx - .275, -hd + .33, .01, .38],[sx + .275, -hd + .33, .01, .38],[sx, -hd + .145, .56, .01],[sx, -hd + .515, .56, .01]]) addBox(x, TOP - .1, z, ww, .2, dd, steel, deco);
+  cyl(sx, TOP - .185, -hd + .33, .03, .012, dark);
+  cyl(sx, TOP + .14, -hd + .09, .018, .28, steel); const sp = new THREE.Mesh(new THREE.TorusGeometry(.09, .015, 8, 16, Math.PI), steel); sp.rotation.y = Math.PI / 2; sp.position.set(sx, TOP + .28, -hd + .18); roomGroup.add(sp);
+  for(const dx of [-.1, .1]) cyl(sx + dx, TOP + .03, -hd + .09, .02, .06, grip);
+  splash(R0, R1); uppers(R0, sx - .5); uppers(sx + .5, R1);
+  { const pane = new THREE.Mesh(new THREE.PlaneGeometry(.84, .62), new THREE.MeshBasicMaterial({ color:'#cfe6f2' })); pane.position.set(sx, 1.87, -hd + .012); roomGroup.add(pane);
+    for(const [x, y, ww, hh] of [[sx, 2.2, .96, .06],[sx, 1.54, .96, .06],[sx - .45, 1.87, .06, .72],[sx + .45, 1.87, .06, .72],[sx, 1.87, .03, .62]]) addBox(x, y, -hd + .03, ww, hh, .04, white, deco); }
+  const pr = Math.min(.75, halfR - .2); prop(sx - pr, -hd + .3, .4); prop(sx + pr, -hd + .32, -.6);
+
+  /* left run: stove under a hood */
+  const L0 = -hw + .05, L1 = -1.0, stx = (L0 + L1) / 2, halfL = (L1 - L0) / 2;
+  base(L0, stx - .32); base(stx + .32, L1); counter(L0, stx - .31); counter(stx + .31, L1);
+  const st = [addBox(stx, .45, -hd + .3, .6, .9, .6, white), addBox(stx, .42, -hd + .605, .5, .44, .02, dark, deco), addBox(stx, .7, -hd + .64, .46, .025, .025, grip, deco), addBox(stx, .93, -hd + .3, .6, .03, .6, dark, { collide:false }), addBox(stx, 1.0, -hd + .03, .6, .12, .03, white, deco)];
+  for(const [dx, dz] of [[-.15, -.13],[.15, -.13],[-.15, .15],[.15, .15]]) st.push(cyl(stx + dx, TOP + .003, -hd + .3 + dz, .085, .008, std('#3a3d42'), 20));
+  for(const dx of [-.21, -.07, .07, .21]){ const k = cyl(stx + dx, .82, -hd + .615, .022, .03, grip); k.rotation.x = Math.PI / 2; st.push(k); }
+  slot(st, { cat:['electronics & appliances/home appliances'], legacy:['appliances'], kw:['stove','oven','cooker','range'], not:['barrel','wood','camp'], x:stx, z:-hd, back:[0, 1], rot:0, h:.93 });
+  { const hood = new THREE.Mesh(new THREE.CylinderGeometry(.17, .47, .3, 4, 1), steel); hood.rotation.y = Math.PI / 4; hood.position.set(stx, 1.72, -hd + .31); roomGroup.add(hood); addBox(stx, (1.87 + h) / 2, -hd + .2, .26, h - 1.87, .26, steel, deco); }
+  splash(L0, L1); uppers(L0, stx - .5); uppers(stx + .5, L1);
+  const pl = Math.min(.8, halfL - .2); prop(stx - pl, -hd + .3, -.3); prop(stx + pl, -hd + .32, .7);
+
+  /* fridge on the east wall, facing into the room */
+  const fz = hd - 1.4, fx = hw - .38;
+  addBox(fx, .975, fz, .72, 1.95, .8, steel); addBox(fx - .362, .78, fz, .012, .018, .8, dark, deco);
+  addBox(fx - .385, 1.3, fz - .32, .03, .55, .03, grip, deco); addBox(fx - .385, .48, fz - .32, .03, .34, .03, grip, deco); addBox(fx, .03, fz, .7, .06, .78, dark, deco);
+
+  /* island with stools and two pendant lights */
+  addBox(0, .45, 0, 1.6, .9, .8, paint); for(const dx of [-.4, .4]) addBox(dx, .47, .405, .74, .78, .02, door, deco); addBox(0, TOP - .0225, 0, 2, .045, 1.05, top, { collide:false });
+  for(const dx of [-.55, .55]){ cyl(dx, .66, .82, .17, .05, wood, 20); cyl(dx, .33, .82, .025, .64, grip); cyl(dx, .02, .82, .15, .03, grip, 20); }
+  for(const dx of [-.5, .5]){ addBox(dx, (2.08 + h) / 2, 0, .012, h - 2.08, .012, dark, deco); const sh = new THREE.Mesh(new THREE.ConeGeometry(.17, .2, 20, 1, true), std('#2d3a38', { side:THREE.DoubleSide })); sh.position.set(dx, 2.0, 0); roomGroup.add(sh); lamp(dx, 1.93, 0, T.light, 6); }
+  lamp(-hw + 1.5, 2.4, hd - 1.5, T.light, 6); lamp(hw - 1.6, 2.4, -hd + 1.4, T.light, 5);
+  prop(-.68, .12, .3); prop(.68, -.1, -.5);
+}
+
 /* Swap the plain stand-in furniture for real models from the online library. */
 const phCache = new Map();
 async function phProto(id){
@@ -444,10 +500,18 @@ async function phProto(id){
   })();
   phCache.set(id, job); job.catch(() => phCache.delete(id)); return job;
 }
-function resolveSlot(sl){
+const PROP_PREF = ['kettle','teapot','pot','bowl','banana','bananas','fruit','jug','jar','bottle','board','cans','can','mug','cup','pan','plate','spoon'];
+function inCat(a, sl){ const c = (a.category || '').toLowerCase(), leg = (a.categories || []).map(x => String(x).toLowerCase()); return (sl.cat || []).some(k => c.startsWith(k)) || (sl.legacy || []).some(k => leg.includes(k)); }
+function resolveSlot(sl, used){
   const models = lib.all || {}, out = [];
+  if(sl.prop){
+    const c = []; for(const [id, a] of Object.entries(models)){ if(used.has(id) || !inCat(a, { cat:['food & kitchen','electronics & appliances/home appliances'], legacy:['food','cookware','kitchen'] })) continue;
+      const dm = a.dimensions; if(!dm || dm.length < 3) continue; const big = Math.max(...dm) / 1000; if(big > .45 || big < .07) continue;
+      const words = (a.name || '').toLowerCase().split(/[^a-z]+/); let pi = PROP_PREF.findIndex(k => words.includes(k)); if(pi < 0) pi = 99; c.push([id, pi, a.download_count || 0]); }
+    c.sort((x, y) => x[1] - y[1] || y[2] - x[2]); const ids = c.slice(0, 3).map(x => x[0]); if(ids[0]) used.add(ids[0]); return ids;
+  }
   if(sl.kw){
-    const c = []; for(const [id, a] of Object.entries(models)){ if(a.type !== undefined && a.type !== 2) continue; const words = (a.name || '').toLowerCase().split(/[^a-z]+/); if(!sl.kw.some(k => words.includes(k))) continue;
+    const c = []; for(const [id, a] of Object.entries(models)){ if(a.type !== undefined && a.type !== 2) continue; if(sl.cat && !inCat(a, sl)) continue; const words = (a.name || '').toLowerCase().split(/[^a-z]+/); if(!sl.kw.some(k => words.includes(k)) || (sl.not || []).some(k => words.includes(k))) continue;
       const d = a.dimensions; if(!d || d.length < 3) continue; const r = sl.h / (d[2] / 1000); if(r < .6 || r > 1.6 || d[0] / 1000 > 2.6) continue; c.push([id, a.download_count || 0]); }
     c.sort((x, y) => y[1] - x[1]); out.push(...c.slice(0, 2).map(x => x[0]));
   }
@@ -457,15 +521,15 @@ function resolveSlot(sl){
 async function upgradeFurniture(room, token){
   if(P.realFurniture === false || !slots.length) return;
   await libLoad(); if(!lib.all || token !== buildToken) return;
-  let told = false;
+  let told = false; const used = new Set();
   for(const sl of slots){
     let proto = null;
-    for(const id of resolveSlot(sl)){
+    for(const id of resolveSlot(sl, used)){
       if(!told && !phCache.has(id) && !(await fileGet('ph_' + id))){ told = true; toast('Fetching real furniture. The first visit to a room takes a little while.', 5000); }
       try{ proto = await phProto(id); break; }catch(e){ console.warn('furniture', id, e); }
     }
     if(token !== buildToken) return; if(!proto) continue;
-    const { g, sz } = proto; let s = sl.h / sz.y; if(s < .6 || s > 1.6) s = 1;
+    const { g, sz } = proto; let s = sl.prop ? 1 : sl.h / sz.y; if(s < .6 || s > 1.6) s = 1;
     const n = sl.span ? Math.max(1, Math.floor(sl.span / (sz.x * s + .03))) : 1, step = sz.x * s + .03;
     for(let i = 0; i < n; i++){
       const c = g.clone(true); c.scale.setScalar(s); c.rotation.y = sl.rot || 0;
