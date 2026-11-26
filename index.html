@@ -184,7 +184,8 @@ a{color:var(--brass)}
     <label><span>Size of the scene: <b id="rScaleV"></b></span><input id="rScale" type="range" min="0.2" max="5" step="0.05"></label>
     <label><span>Floor height: <b id="rYV"></b></span><input id="rY" type="range" min="-3" max="3" step="0.05"></label>
   </div>
-  <div class="row"><button id="rReal">Real furniture</button></div>
+  <label id="rDescL"><span>Description (type and style)</span><input id="rDesc" type="text" placeholder="warm wooden living room"></label>
+  <div class="row"><button id="rRebuild">Refurnish from description</button><button id="rReal">Real furniture</button></div>
   <div class="row"><button id="rAdd" class="primary">+ Add a room</button><span class="grow"></span><button id="rDelete" class="danger">Delete room</button></div>
   <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0">
   <label><span>Palace name</span><input id="pName" type="text"></label>
@@ -209,18 +210,20 @@ a{color:var(--brass)}
   </div>
   <div id="roomModal" class="modal glass" role="dialog" aria-labelledby="roomT">
     <h2 id="roomT">New room</h2>
-    <label><span>Name</span><input id="nName" type="text" placeholder="Kitchen"></label>
+    <label><span>Name</span><input id="nName" type="text" placeholder="Living room"></label>
     <div class="row">
-      <label class="grow" style="flex:1"><span>Style</span><select id="nTheme"></select></label>
+      <label class="grow" style="flex:2"><span>Describe the room</span><input id="nDesc" type="text" placeholder="warm wooden living room" autocomplete="off"></label>
       <label class="grow" style="flex:1"><span>Size</span><select id="nSize"><option value="S">Small, 6 × 6 m</option><option value="M" selected>Medium, 8 × 7 m</option><option value="L">Large, 11 × 9 m</option></select></label>
     </div>
     <div class="row">
       <label class="grow" style="flex:1"><span>Door from</span><select id="nFrom"></select></label>
       <label class="grow" style="flex:1"><span>On its</span><select id="nWall"></select></label>
     </div>
+    <div class="small" id="nPrev" style="color:var(--brass)"></div>
+    <div class="small muted">Room types it knows: living room, bedroom, kitchen, dining room, study, library, bathroom, gallery, garden room, stone vault. Add style words such as wood, warm, bright, dark, modern, classic, stone, marble, or a wall colour.</div>
     <label><span>Or use a generated or scanned room file (.spz, .ply, .splat, .ksplat, .sog)</span><input id="nSplat" type="file" accept=".spz,.ply,.splat,.ksplat,.sog"></label>
     <label><span>Its walls-and-floor file, if it came with one (.glb)</span><input id="nCol" type="file" accept=".glb"></label>
-    <div class="note">Text-to-room is not connected yet. Built-in styles are stand-ins. A room file from a generator such as Hunyuan World or Atlas loads as the real photoreal room.</div>
+    <div class="note">The room is assembled from parts and furnished to match your words. A room file from a generator such as Hunyuan World loads as a photoreal room instead.</div>
     <div class="row"><span class="grow"></span><button data-cancel>Cancel</button><button id="nCreate" class="primary">Create room</button></div>
   </div>
 </div>
@@ -243,8 +246,46 @@ const THEMES = {
   kitchen:{ label:'Kitchen', floor:'tiles', fc:'#c9b28f', wall:'#e6dac2', ceil:'#f1eadb', light:'#fff1d6' },
   gallery:{ label:'Gallery', floor:'planks', fc:'#b89a74', wall:'#ebe6dd', ceil:'#f4f1ea', light:'#ffffff' },
   garden:{ label:'Garden room', floor:'stone', fc:'#8d8a80', wall:'#a3baa2', ceil:'#dfe8dd', light:'#f3ffe8' },
-  vault:{ label:'Stone vault', floor:'stone', fc:'#4c4a50', wall:'#55525c', ceil:'#2c2a30', light:'#ffd9a0' }
+  vault:{ label:'Stone vault', floor:'stone', fc:'#4c4a50', wall:'#55525c', ceil:'#2c2a30', light:'#ffd9a0', windows:false, beams:true, crown:false, wallTex:'stonewall' },
+  living:{ label:'Living room', floor:'planks', fc:'#8a5a36', wall:'#e7dcc8', ceil:'#f4efe4', light:'#ffe2b8' },
+  bedroom:{ label:'Bedroom', floor:'carpet', fc:'#b7a58f', wall:'#d8d2c8', ceil:'#f2efe9', light:'#ffdcae' },
+  dining:{ label:'Dining room', floor:'planks', fc:'#6e4527', wall:'#d9c9a9', ceil:'#f1eadb', light:'#ffd9a0' },
+  office:{ label:'Study', floor:'planks', fc:'#7a5232', wall:'#cfd6d1', ceil:'#f0efea', light:'#fff0d8' },
+  bathroom:{ label:'Bathroom', floor:'tiles', fc:'#cfd9dc', wall:'#e8eff0', ceil:'#f6f8f8', light:'#ffffff', wainscot:'tile' }
 };
+THEMES.library.win = ['right','opp']; THEMES.kitchen.win = ['left','opp']; THEMES.office.win = ['right','opp']; THEMES.library.sky = '#2b3b55'; THEMES.library.wainscot = 'wood'; THEMES.library.beams = true;
+const lookOf = room => ({ ...(THEMES[room.theme] || THEMES.gallery), ...(room.style || {}) });
+const KIND_WORDS = [
+  ['kitchen', /kitchen|pantry|galley/], ['living', /living|lounge|sitting|family room|\bden\b|parlou?r|salon|tv room/], ['bedroom', /bed ?room|bedchamber|dorm|sleeping/],
+  ['dining', /dining|banquet|breakfast room/], ['library', /library|reading room|book ?room/], ['office', /office|study|workspace|work room|studio/],
+  ['bathroom', /bath|toilet|restroom|washroom|shower/], ['gallery', /gallery|museum|exhibit|showroom/], ['garden', /garden|conservatory|greenhouse|patio|courtyard|sunroom/],
+  ['vault', /vault|cellar|dungeon|crypt|basement|cave|castle|treasury/]
+];
+const WALL_COLORS = { burgundy:'#6e2b33', red:'#8c3b34', sage:'#a9b8a0', green:'#5d7a5f', navy:'#2f3f5c', blue:'#6f8fae', yellow:'#e6cf7a', pink:'#e3b7b5', purple:'#75608c', grey:'#a9a9a6', gray:'#a9a9a6', charcoal:'#3a393c', black:'#2e2d30', white:'#f1efe9', cream:'#ece2cc', beige:'#e3d6bd', terracotta:'#c9764f', orange:'#d08a4e', teal:'#3f7f7d', brown:'#7b5a43' };
+const FLOOR_NAMES = { planks:'wood', tiles:'tiled', stone:'stone', carpet:'carpet', concrete:'concrete' };
+function mix(a, b, t){ return '#' + new THREE.Color(a).lerp(new THREE.Color(b), t).getHexString(); }
+function parseRoomText(text){
+  const t = ' ' + (text || '').toLowerCase() + ' '; const has = re => re.test(t);
+  let theme = null; for(const [k, re] of KIND_WORDS) if(re.test(t)){ theme = k; break; }
+  const known = !!theme; if(!theme) theme = 'living';
+  const base = THEMES[theme], st = {}, notes = [];
+  if(has(/walnut|dark wood|mahogany/)){ st.floor = 'planks'; st.fc = '#5c3a22'; }
+  else if(has(/oak|light wood|pine|birch|scandi/)){ st.floor = 'planks'; st.fc = '#b98d57'; }
+  else if(has(/wood|timber|parquet|plank|cabin|rustic/)){ st.floor = 'planks'; st.fc = '#7f5230'; }
+  if(has(/marble/)){ st.floor = 'tiles'; st.fc = '#e6e3dd'; } else if(has(/tile|checker/)){ st.floor = 'tiles'; st.fc = st.fc || '#c9b28f'; }
+  if(has(/stone|slate|medieval|castle/)){ st.floor = 'stone'; st.fc = '#77736c'; if(theme !== 'vault') st.wall = '#a9a39a'; st.beams = true; }
+  if(has(/carpet/)){ st.floor = 'carpet'; st.fc = '#a8957f'; }
+  if(has(/concrete|industrial|loft/)){ st.floor = 'concrete'; st.fc = '#8c8b87'; st.wall = '#bdbab4'; st.crown = false; notes.push('industrial'); }
+  if(has(/wood|timber|cabin|rustic|panel/)){ st.wainscot = 'wood'; st.beams = true; notes.push('wood panelling'); }
+  if(has(/classic|elegant|victorian|luxur|grand|traditional/)){ st.wainscot = st.wainscot || 'painted'; st.crown = true; notes.push('classic trim'); }
+  for(const [k, c] of Object.entries(WALL_COLORS)) if(t.includes(' ' + k + ' ') || t.includes(' ' + k + ',')){ st.wall = c; notes.push(k + ' walls'); break; }
+  if(has(/bright|airy|minimal|modern|clean|scandi/)){ if(!notes.some(n => n.endsWith('walls'))) st.wall = '#f2f0ea'; st.ceil = '#fbfaf6'; st.light = '#ffffff'; st.crown = false; if(!has(/wood|panel/)) st.wainscot = null; notes.push('bright'); }
+  if(has(/warm|cozy|cosy|snug|golden/)){ st.wall = mix(st.wall || base.wall, '#e2b780', .35); st.light = '#ffc27a'; notes.push('warm'); }
+  if(has(/cool|fresh|calm/)){ st.wall = mix(st.wall || base.wall, '#bcd0dc', .4); st.light = '#f2f8ff'; notes.push('cool'); }
+  if(has(/dark|moody|night|candle|dim/)){ st.wall = mix(st.wall || base.wall, '#17120f', .55); st.ceil = mix(base.ceil, '#17120f', .6); st.sky = '#2b3b55'; st.dim = .6; notes.push('dark'); }
+  const L = { ...base, ...st };
+  return { theme, style:st, known, summary:`${base.label} · ${FLOOR_NAMES[L.floor] || L.floor} floor${notes.length ? ' · ' + notes.join(', ') : ''}` };
+}
 
 /* ---------- storage ---------- */
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -331,6 +372,10 @@ function floorTex(kind, col, w, d){
       for(let i = 0; i < 8; i++){ g.fillStyle = shade(col, .82 + ((i * 37) % 9) / 30); g.fillRect(0, i * 32, W, 31); g.fillStyle = shade(col, .55); g.fillRect(((i * 97) % 200), i * 32, 2, 31); }
     } else if(kind === 'tiles'){
       for(let y = 0; y < 4; y++) for(let x = 0; x < 4; x++){ g.fillStyle = (x + y) % 2 ? shade(col, .78) : shade(col, 1.08); g.fillRect(x * 64 + 1, y * 64 + 1, 62, 62); }
+    } else if(kind === 'carpet'){
+      for(let i = 0; i < 2600; i++){ g.fillStyle = shade(col, .86 + ((i * 37) % 30) / 100); g.fillRect((i * 97) % W, (i * 61 + (i >> 3) * 7) % H, 2, 2); }
+    } else if(kind === 'concrete'){
+      for(let i = 0; i < 90; i++){ g.fillStyle = shade(col, .9 + ((i * 53) % 20) / 100); g.globalAlpha = .5; g.beginPath(); g.arc((i * 71) % W, (i * 113) % H, 12 + (i * 7) % 30, 0, 7); g.fill(); } g.globalAlpha = 1;
     } else {
       for(let i = 0; i < 60; i++){ g.fillStyle = shade(col, .8 + ((i * 53) % 40) / 100); const x = (i * 71) % W, y = (i * 113) % H; g.fillRect(x, y, 30 + (i * 7) % 50, 20 + (i * 11) % 40); }
       g.strokeStyle = shade(col, .6); g.lineWidth = 2; for(let i = 0; i <= 2; i++){ g.strokeRect(0, i * 128, W, 128); g.strokeRect(i * 128, 0, 128, H); }
@@ -398,8 +443,9 @@ const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness
 function furnish(room){
   const { w, d, theme } = room, hw = w / 2, hd = d / 2;
   const lamp = (x, y, z, col, power = 9) => { const l = new THREE.PointLight(col, power, 14, 1.6); l.position.set(x, y, z); roomGroup.add(l); const b = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), new THREE.MeshBasicMaterial({ color:col })); b.position.copy(l.position); roomGroup.add(b); };
-  const T = THEMES[theme];
+  const T = lookOf(room);
   const slot = (meshes, o) => slots.push({ meshes, ...o });
+  if(ROOMS[theme]){ ROOMS[theme](frameOf(room), slot, lamp, T); return; }
   if(theme === 'library'){
     const sw = hw - 1.3, bt = booksTex();
     for(const sx of [-1, 1]){ const m = std('#ffffff', { map:bt.clone() }); m.map.repeat.set(sw / 1.6, 1.4); m.map.needsUpdate = true; const b = addBox(sx * (.9 + sw / 2), 1.3, -hd + .22, sw, 2.6, .44, m); slot([b], { ids:['Shelf_01'], x:sx * (.9 + sw / 2), z:-hd, back:[0, 1], rot:0, h:2.3, span:sw }); }
@@ -430,9 +476,162 @@ function furnish(room){
 }
 
 
+
+/* ---------- walls, ceiling and windows: trim that makes a box read as a room ---------- */
+function focusWall(room){ return ['N','E','W','S'].find(k => !room.doors.some(d => d.wall === k)) || 'N'; }
+function decorate(room, T){
+  const { w, d, h } = room, deco = { collide:false, pick:false };
+  const trim = std(mix(T.ceil, '#ffffff', .25), { roughness:.6 });
+  for(const k of ['N','S','E','W']){
+    const len = (k === 'N' || k === 'S') ? w : d, p = doorPos(room, k), n = wallNormal(k), ns = (k === 'N' || k === 'S');
+    const strip = (y, hh, dep, mat) => { const off = dep / 2 + .001; addBox(p.x + n.x * off, y, p.z + n.z * off, ns ? len : dep, hh, ns ? dep : len, mat, deco); };
+    if(T.crown !== false){ strip(h - .06, .12, .08, trim); strip(h - .15, .05, .04, trim); }
+    if(T.wainscot){
+      const hasDoor = room.doors.some(x => x.wall === k), mat = T.wainscot === 'wood' ? std(shade(T.fc, .85), { roughness:.6 }) : T.wainscot === 'tile' ? std(mix(T.wall, '#ffffff', .5), { roughness:.2 }) : std(mix(T.wall, '#ffffff', .35), { roughness:.6 });
+      const top = T.wainscot === 'tile' ? 1.25 : 1.0, segs = hasDoor ? [[-len / 2, -.68], [.68, len / 2]] : [[-len / 2, len / 2]];
+      for(const [a, b] of segs){ const c = (a + b) / 2, l = b - a, tx = ns ? c : 0, tz = ns ? 0 : c;
+        addBox(p.x + tx + n.x * .016, top / 2, p.z + tz + n.z * .016, ns ? l : .03, top, ns ? .03 : l, mat, deco);
+        addBox(p.x + tx + n.x * .03, top + .025, p.z + tz + n.z * .03, ns ? l : .06, .05, ns ? .06 : l, mat, deco);
+        if(T.wainscot !== 'tile'){ const np = Math.max(1, Math.round(l / .9)); for(let i = 1; i < np; i++){ const o = a + l * i / np; addBox(p.x + (ns ? o : 0) + n.x * .034, top / 2, p.z + (ns ? 0 : o) + n.z * .034, ns ? .04 : .012, top - .16, ns ? .012 : .04, std(shade('#' + mat.color.getHexString(), .8)), deco); } }
+      }
+    }
+  }
+  if(T.beams){ const bm = std(shade(T.floor === 'planks' ? T.fc : '#5a4230', .7), { roughness:.8 }), n = Math.max(2, Math.round(d / 1.5)); for(let i = 0; i < n; i++) addBox(0, h - .09, -d / 2 + d * (i + .5) / n, w, .18, .16, bm, deco); }
+  if(T.windows !== false){
+    const SIDES = { N:{ right:'E', left:'W', opp:'S' }, S:{ right:'W', left:'E', opp:'N' }, E:{ right:'S', left:'N', opp:'W' }, W:{ right:'N', left:'S', opp:'E' } }[focusWall(room)], order = (T.win || ['right','left','opp']).map(x => SIDES[x]), k = order.find(x => !room.doors.some(dd => dd.wall === x)) || SIDES.opp, len = (k === 'N' || k === 'S') ? w : d, p = doorPos(room, k), n = wallNormal(k), tan = new THREE.Vector3(-n.z, 0, n.x);
+    const sky = canvasTex(64, 128, (g, W, H) => { const gr = g.createLinearGradient(0, 0, 0, H); const c = new THREE.Color(T.sky || '#bfe0f5'); gr.addColorStop(0, '#' + c.clone().multiplyScalar(.85).getHexString()); gr.addColorStop(1, '#' + c.clone().lerp(new THREE.Color('#ffffff'), .45).getHexString()); g.fillStyle = gr; g.fillRect(0, 0, W, H); });
+    for(const sgn of [-1, 1]){
+      const c = p.clone().addScaledVector(tan, sgn * len / 4), g = new THREE.Group(); g.position.copy(c).addScaledVector(n, .012).setY(1.6); g.lookAt(g.position.clone().add(n)); roomGroup.add(g);
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.3), new THREE.MeshBasicMaterial({ map:sky })); g.add(pane);
+      for(const [x, y, ww, hh, dz] of [[0, .68, 1.26, .08, .03],[0, -.68, 1.26, .08, .03],[-.59, 0, .08, 1.44, .03],[.59, 0, .08, 1.44, .03],[0, 0, .035, 1.3, .02],[0, 0, 1.1, .035, .02],[0, -.75, 1.36, .05, .09]]){ const b = new THREE.Mesh(new THREE.BoxGeometry(ww, hh, dz * 2), trim); b.position.set(x, y, dz); g.add(b); }
+      const l = new THREE.PointLight(T.sky ? '#8fa6c8' : '#eaf4ff', T.sky ? 2 : 5, 9, 1.8); l.position.copy(c).addScaledVector(n, .5).setY(1.7); roomGroup.add(l);
+    }
+  }
+}
+
+/* ---------- real floor and wall materials from the online library ---------- */
+const tex = { all:null, loading:null }; const BAD = ['damaged','broken','dirty','old','worn','mossy','rusty','rotten','burnt','cracked','peeling','weathered','rough','wet','muddy','snow','leaves','decayed','ruined','aerial','dry','grass','roof','fence','bark','table'];
+const TEXRULES = {
+  planks:{ all:[['wood','wooden','parquet','laminate','plank','planks','herringbone'],['floor','parquet','planks','laminate','herringbone','flooring']], none:['wall'] },
+  tiles:{ all:[['tiles','tile','tiled','checkered','marble'],['floor','tiles','marble']], none:['wall','ceiling'] },
+  stone:{ all:[['stone','slab','flagstone','slate','cobblestone','paving'],['floor','tiles','slab','paving','flagstone']], none:['wall'] },
+  concrete:{ all:[['concrete'],['floor','polished','smooth','concrete']], none:['wall','brick','block','blocks','bricks'] },
+  carpet:{ all:[['carpet','rug']], none:[] },
+  wall:{ all:[['plaster','plastered','stucco'],['wall','plaster','plastered','white','painted','stucco']], none:['brick','bricks','stone','yellow','red','blue','green','pink','orange','grey','gray'] },
+  stonewall:{ all:[['stone','castle','brick','bricks'],['wall']], none:[] }
+};
+async function texLoad(){
+  if(tex.all || lib.dead) return; if(!tex.loading) tex.loading = fetch(PH + '/assets?t=textures').then(r => r.ok ? r.json() : Promise.reject(r.status)).then(j => { tex.all = j; }).catch(() => { lib.dead = true; });
+  await tex.loading;
+}
+function pickTex(kind){
+  const R = TEXRULES[kind]; if(!R || !tex.all) return null; let best = null;
+  for(const [id, a] of Object.entries(tex.all)){ if(a.type !== undefined && a.type !== 1) continue; const words = (a.name || id).toLowerCase().split(/[^a-z]+/);
+    if(!R.all.every(g => g.some(k => words.includes(k))) || R.none.concat(BAD).some(k => words.includes(k))) continue; if(!best || (a.download_count || 0) > (best[1].download_count || 0)) best = [id, a]; }
+  return best;
+}
+const texCache = new Map();
+async function texMaps(id){
+  if(texCache.has(id)) return texCache.get(id);
+  const job = (async () => {
+    let b = await fileGet('tx_' + id);
+    if(!b){ const f = await (await fetch(`${PH}/files/${id}`)).json(); const keys = Object.keys(f); const find = re => keys.find(k => re.test(k) && typeof f[k] === 'object');
+      const url = k => { if(!k) return null; const r = f[k]['1k'] || Object.values(f[k])[0]; const x = r && (r.jpg || r.png || Object.values(r)[0]); return x && x.url; };
+      const du = url(find(/^(diffuse|diff|col|color|albedo)/i)), nu = url(find(/nor_gl/i)); if(!du) throw new Error('no colour map');
+      b = { d:await (await fetch(du)).arrayBuffer(), n:nu ? await (await fetch(nu)).arrayBuffer() : null }; await filePut('tx_' + id, b); }
+    const mk = async (buf, srgb) => { if(!buf) return null; const bmp = await createImageBitmap(new Blob([buf]), { imageOrientation:'flipY' }); const t = new THREE.Texture(bmp); if(srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 4; t.needsUpdate = true; return t; };
+    return { d:await mk(b.d, true), n:await mk(b.n, false) };
+  })();
+  texCache.set(id, job); job.catch(() => texCache.delete(id)); return job;
+}
+async function upgradeSurfaces(room, token, T, floorM, wA, wB, ceilM){
+  if(P.realFurniture === false) return; await libLoad(); if(lib.dead) return; await texLoad(); if(!tex.all || token !== buildToken) return;
+  const use = async (kind, mats, sizes, tint) => { const pk = pickTex(kind); if(!pk) return; const [id, a] = pk; let m; try{ m = await texMaps(id); }catch(e){ console.warn('texture', id, e); return; } if(token !== buildToken) return;
+    const tile = Math.min(4, Math.max(.4, ((a.dimensions && a.dimensions[0]) || 2000) / 1000));
+    mats.forEach((mat, i) => { const t = m.d.clone(); t.repeat.set(sizes[i][0] / tile, sizes[i][1] / tile); t.needsUpdate = true; mat.map = t; mat.color.set(tint || '#ffffff'); if(m.n && i === 0 && kind !== 'wall'){ const nn = m.n.clone(); nn.repeat.copy(t.repeat); nn.needsUpdate = true; mat.normalMap = nn; } mat.needsUpdate = true; }); };
+  await use(T.floor, [floorM], [[room.w, room.d]], T.floor === 'carpet' ? T.fc : null);
+  await use(T.wallTex || 'wall', [wA, wB], [[room.w, room.h], [room.d, room.h]], T.wallTex ? '#c9c4be' : T.wall);
+}
+
+/* ---------- furnished room types, laid out relative to whichever wall has no door ---------- */
+function frameOf(room){
+  const k = focusWall(room), th = { N:0, S:Math.PI, E:-Math.PI / 2, W:Math.PI / 2 }[k], c = Math.round(Math.cos(th)), s = Math.round(Math.sin(th)), quarter = s !== 0;
+  const W = quarter ? room.d : room.w, D = quarter ? room.w : room.d;
+  const pt = (x, z) => [x * c + z * s, -x * s + z * c];
+  return { room, W, D, h:room.h, th, pt,
+    box(x, y, z, w, hh, d, mat, o){ const [X, Z] = pt(x, z); return addBox(X, y, Z, quarter ? d : w, hh, quarter ? w : d, mat, o); },
+    cyl(x, y, z, r, hh, mat, seg = 18, r2){ const [X, Z] = pt(x, z); const m = new THREE.Mesh(new THREE.CylinderGeometry(r2 ?? r, r, hh, seg), mat); m.position.set(X, y, Z); roomGroup.add(m); pickables.push(m); return m; },
+    spot(o){ const [X, Z] = pt(o.x, o.z); const out = { ...o, x:X, z:Z, rot:(o.rot || 0) + th }; if(o.back){ const [bx, bz] = pt(o.back[0], o.back[1]); out.back = [bx, bz]; } return out; } };
+}
+function rug(F, x, z, w, d, colA, colB){
+  const t = canvasTex(256, 256, (g, W, H) => { g.fillStyle = colA; g.fillRect(0, 0, W, H); g.strokeStyle = colB; g.lineWidth = 10; g.strokeRect(14, 14, W - 28, H - 28); g.lineWidth = 3; g.strokeRect(34, 34, W - 68, H - 68); g.fillStyle = colB; for(let i = 0; i < 5; i++) for(let j = 0; j < 5; j++){ g.beginPath(); g.arc(64 + i * 32, 64 + j * 32, (i + j) % 2 ? 4 : 8, 0, 7); g.fill(); } });
+  F.box(x, .012, z, w, .02, d, std('#ffffff', { map:t, roughness:.95 }), { collide:false });
+}
+function floorLamp(F, lamp, x, z, col){ const [X, Z] = F.pt(x, z); F.cyl(x, .015, z, .16, .03, std('#2b2b2b')); F.cyl(x, .8, z, .015, 1.55, std('#2b2b2b')); const sh = new THREE.Mesh(new THREE.CylinderGeometry(.14, .22, .3, 20, 1, true), new THREE.MeshBasicMaterial({ color:'#ffe9c2', side:THREE.DoubleSide })); sh.position.set(X, 1.62, Z); roomGroup.add(sh); lamp(X, 1.55, Z, col, 6); }
+function plant(F, slot, x, z){ const pot = F.box(x, .22, z, .42, .44, .42, std('#a0593a')); const [X, Z] = F.pt(x, z); const b = new THREE.Mesh(new THREE.SphereGeometry(.42, 14, 10), std('#3f7a45')); b.position.set(X, .85, Z); b.scale.y = 1.25; roomGroup.add(b); pickables.push(b); slot([pot, b], F.spot({ kw:['potted','planter'], x, z, h:1.2 })); }
+const ROOMS = {
+  living(F, slot, lamp, T){
+    const { W, D, h } = F, wd = std(shade(T.fc, .8)), fab = std('#7d8a86', { roughness:.95 }), deco = { collide:false, pick:false };
+    rug(F, 0, .25, Math.min(3.4, W - 2.4), 2.4, '#8a2f2b', '#e3c88f');
+    slot([F.box(0, .3, -D / 2 + .25, 1.5, .6, .45, wd)], F.spot({ ids:['ClassicConsole_01','WoodenTable_03'], x:0, z:-D / 2, back:[0, 1], h:.62 }));
+    slot([F.box(0, 1.0, -D / 2 + .25, 1.15, .66, .06, std('#141518', { roughness:.3 })), F.box(0, .64, -D / 2 + .25, .3, .06, .2, std('#141518'), deco)], F.spot({ ids:['Television_01'], x:0, z:-D / 2 + .27, y:.62, h:.5 }));
+    slot([F.box(0, .22, 1.35, 2.0, .44, .85, fab), F.box(0, .62, 1.72, 2.0, .5, .2, fab, deco), F.box(-.92, .5, 1.35, .16, .26, .85, fab, deco), F.box(.92, .5, 1.35, .16, .26, .85, fab, deco)], F.spot({ ids:['Sofa_01'], x:0, z:1.4, rot:Math.PI, h:.8 }));
+    slot([F.box(0, .36, .1, 1.2, .06, .65, wd), F.box(0, .17, .1, 1.0, .34, .5, wd, deco)], F.spot({ ids:['CoffeeTable_01','WoodenTable_01'], x:0, z:.1, h:.42 }));
+    const ax = Math.min(2.0, W / 2 - .9);
+    for(const sx of [-1, 1]) slot([F.box(sx * ax, .25, .2, .8, .5, .8, fab), F.box(sx * (ax + .3), .6, .2, .2, .5, .8, fab, deco)], F.spot({ ids:sx < 0 ? ['ArmChair_01','GreenChair_01'] : ['GreenChair_01','ArmChair_01'], x:sx * ax, z:.2, rot:-sx * Math.PI / 2, h:1.05 }));
+    if(W >= 7.5) for(const sx of [-1, 1]) slot([F.box(sx * (W / 2 - .7), 1.05, -D / 2 + .15, 1.0, 2.1, .3, wd)], F.spot({ ids:['Shelf_01'], x:sx * (W / 2 - .7), z:-D / 2, back:[0, 1], h:2.08 }));
+    floorLamp(F, lamp, -W / 2 + .55, D / 2 - .6, T.light); plant(F, slot, W / 2 - .55, D / 2 - .6);
+    slot([], F.spot({ ids:['Chandelier_02','Chandelier_01'], x:0, z:.3, hang:true, h:.85 })); { const [X, Z] = F.pt(0, .3); lamp(X, h - .9, Z, T.light, 11); }
+  },
+  bedroom(F, slot, lamp, T){
+    const { W, D, h } = F, wd = std(shade(T.floor === 'planks' ? T.fc : '#6b4a30', .8)), linen = std('#eee9df', { roughness:.95 }), deco = { collide:false, pick:false };
+    slot([F.box(0, .28, -D / 2 + 1.08, 1.6, .56, 2.05, linen), F.box(0, .14, -D / 2 + 1.08, 1.7, .28, 2.15, wd, deco), F.box(0, .7, -D / 2 + .06, 1.7, 1.4, .1, wd), F.box(-.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(0, .58, -D / 2 + 1.55, 1.62, .06, 1.0, std('#6f8296', { roughness:.95 }), deco)], F.spot({ ids:['GothicBed_01'], x:0, z:-D / 2, back:[0, 1], h:1.5 }));
+    for(const sx of [-1, 1]){ slot([F.box(sx * 1.25, .3, -D / 2 + .25, .5, .6, .42, wd)], F.spot({ ids:['ClassicNightstand_01','WoodenTable_02'], x:sx * 1.25, z:-D / 2, back:[0, 1], h:.62 })); const [X, Z] = F.pt(sx * 1.25, -D / 2 + .25); lamp(X, 1.0, Z, T.light, 3.5); }
+    slot([], F.spot({ ids:['Lantern_01'], x:-1.25, z:-D / 2 + .25, y:.62, h:.3 }));
+    slot([F.box(W / 2 - .3, .5, .9, .55, 1.0, 1.2, wd)], F.spot({ ids:['GothicCommode_01'], x:W / 2, z:.9, back:[-1, 0], rot:-Math.PI / 2, h:1.1 }));
+    slot([F.box(-W / 2 + .9, .25, D / 2 - 1.1, .8, .5, .8, std('#8a7a6a', { roughness:.95 }))], F.spot({ ids:['ArmChair_01','Rockingchair_01'], x:-W / 2 + .9, z:D / 2 - 1.1, rot:Math.PI * .75, h:1.05 }));
+    rug(F, 0, .9, 2.8, 1.8, '#cfc3ae', '#8c7b63'); plant(F, slot, W / 2 - .5, D / 2 - .5);
+    { const [X, Z] = F.pt(0, .4); lamp(X, h - .5, Z, T.light, 9); }
+  },
+  dining(F, slot, lamp, T){
+    const { W, D, h } = F, wd = std(shade(T.fc, .75)), deco = { collide:false, pick:false };
+    rug(F, 0, 0, 3.6, 2.6, '#2f4a45', '#d9c08a');
+    const tb = [F.box(0, .73, 0, 2.3, .06, 1.0, wd)]; for(const [x, z] of [[-1, -.4],[1, -.4],[-1, .4],[1, .4]]) tb.push(F.box(x, .35, z, .08, .7, .08, wd, deco)); slot(tb, F.spot({ ids:['WoodenTable_01'], x:0, z:0, h:.76 }));
+    for(const [x, z, r] of [[-.65, -.85, 0],[.65, -.85, 0],[-.65, .85, Math.PI],[.65, .85, Math.PI],[-1.55, 0, Math.PI / 2],[1.55, 0, -Math.PI / 2]]) slot([F.box(x, .23, z, .45, .46, .45, wd), F.box(x - Math.sin(r) * .2, .7, z - Math.cos(r) * .2, r % Math.PI ? .06 : .45, .5, r % Math.PI ? .45 : .06, wd, deco)], F.spot({ ids:['GreenChair_01','SchoolChair_01'], x, z, rot:r, h:1.0 }));
+    slot([F.box(0, .45, -D / 2 + .28, 1.6, .9, .5, wd)], F.spot({ ids:['ClassicConsole_01','GothicCommode_01'], x:0, z:-D / 2, back:[0, 1], h:.95 }));
+    slot([], F.spot({ prop:true, x:-.5, z:0, y:.76, rot:.4 })); slot([], F.spot({ prop:true, x:.5, z:.05, y:.76, rot:-.7 }));
+    slot([], F.spot({ ids:['Chandelier_01','Chandelier_03'], x:0, z:0, hang:true, h:.85 })); { const [X, Z] = F.pt(0, 0); lamp(X, h - .95, Z, T.light, 12); }
+    plant(F, slot, W / 2 - .55, D / 2 - .55); plant(F, slot, -W / 2 + .55, D / 2 - .55);
+  },
+  office(F, slot, lamp, T){
+    const { W, D, h } = F, wd = std(shade(T.fc, .8)), deco = { collide:false, pick:false };
+    rug(F, 0, 0, 2.8, 2.0, '#3d4c63', '#c9b58a');
+    F.box(0, .73, -D / 2 + .42, 1.7, .05, .78, wd); F.box(-.62, .35, -D / 2 + .42, .42, .7, .7, wd); F.box(.8, .35, -D / 2 + .42, .06, .7, .7, wd, deco);
+    for(const y of [.55, .33, .11]) F.box(-.62, y, -D / 2 + .775, .36, .18, .02, std(shade(T.fc, .65)), deco);
+    F.box(.15, 1.06, -D / 2 + .22, .66, .4, .03, std('#141518', { roughness:.3 }), deco); F.box(.15, .82, -D / 2 + .22, .06, .14, .05, std('#2b2b2b'), deco); F.box(.15, .765, -D / 2 + .5, .44, .02, .15, std('#2b2b2b'), deco);
+    slot([], F.spot({ ids:['Lantern_01'], x:-.6, z:-D / 2 + .35, y:.755, rot:.6, h:.3 })); { const [X, Z] = F.pt(-.6, -D / 2 + .4); lamp(X, 1.15, Z, T.light, 4); }
+    slot([F.box(.1, .24, -D / 2 + 1.2, .48, .48, .48, std('#333')), F.box(.1, .75, -D / 2 + 1.42, .46, .55, .06, std('#333'), deco)], F.spot({ ids:['GreenChair_01','SchoolChair_01'], x:.1, z:-D / 2 + 1.2, rot:Math.PI, h:1.0 }));
+    slot([F.box(-W / 2 + .16, 1.05, .2, .3, 2.1, Math.min(3, D - 2.4), wd)], F.spot({ ids:['Shelf_01'], x:-W / 2, z:.2, back:[1, 0], rot:Math.PI / 2, h:2.08, span:Math.min(3, D - 2.4) }));
+    slot([F.box(W / 2 - .9, .25, D / 2 - 1.1, .8, .5, .8, std('#7a5c46', { roughness:.95 }))], F.spot({ ids:['ArmChair_01'], x:W / 2 - .9, z:D / 2 - 1.1, rot:-Math.PI * .75, h:1.05 }));
+    plant(F, slot, W / 2 - .5, -D / 2 + .5); floorLamp(F, lamp, W / 2 - .45, D / 2 - .45, T.light); { const [X, Z] = F.pt(0, 0); lamp(X, h - .5, Z, T.light, 9); }
+  },
+  bathroom(F, slot, lamp, T){
+    const { W, D, h } = F, white = std('#f6f6f3', { roughness:.25 }), steel = std('#c3c7ca', { roughness:.3, metalness:.25 }), deco = { collide:false, pick:false };
+    const tx = Math.min(W / 2 - 1.0, 1.2);
+    F.box(-tx, .28, -D / 2 + .42, 1.75, .56, .8, white); F.box(-tx, .5, -D / 2 + .42, 1.55, .02, .6, std('#bfe3ee', { roughness:.1 }), deco); F.cyl(-tx + .7, .75, -D / 2 + .1, .02, .4, steel);
+    const vx = Math.min(W / 2 - .7, tx + 1.9);
+    F.box(vx, .42, -D / 2 + .28, .9, .84, .5, std(mix(T.wall, '#3c5560', .6))); F.box(vx, .86, -D / 2 + .28, .96, .04, .54, white, deco); F.cyl(vx, .9, -D / 2 + .3, .17, .06, white, 24, .2); F.cyl(vx, .98, -D / 2 + .1, .015, .2, steel);
+    F.box(vx, 1.6, -D / 2 + .03, .8, .9, .03, std('#dfeaf0', { roughness:.05, metalness:.4 }), deco); F.box(vx, 1.6, -D / 2 + .02, .88, .98, .02, steel, deco);
+    F.cyl(W / 2 - .45, .2, .6, .2, .4, white, 20, .24); F.box(W / 2 - .16, .55, .6, .2, .5, .42, white); F.box(W / 2 - .45, .42, .6, .46, .04, .4, white, deco);
+    F.box(-W / 2 + .05, 1.25, .5, .04, .04, .8, steel, deco); F.box(-W / 2 + .07, .95, .5, .03, .6, .6, std('#8fb3b0', { roughness:.95 }), deco);
+    rug(F, -tx, .45, 1.2, .7, '#8fb3b0', '#f2f2ee'); plant(F, slot, -W / 2 + .5, D / 2 - .5);
+    { const [X, Z] = F.pt(0, 0); lamp(X, h - .4, Z, T.light, 11); const [X2, Z2] = F.pt(vx, -D / 2 + .5); lamp(X2, 2.1, Z2, T.light, 4); }
+  }
+};
+
 /* A fitted kitchen: base and wall cabinets, sink with tap, stove with hood, fridge, island with stools. */
 function kitchen(room, slot, lamp){
-  const { w, d, h } = room, hw = w / 2, hd = d / 2, T = THEMES.kitchen, TOP = .945;
+  const { w, d, h } = room, hw = w / 2, hd = d / 2, T = lookOf(room), TOP = .945;
   const paint = std('#4f6b66', { roughness:.6 }), door = std('#587872', { roughness:.55 }), white = std('#eeeae0', { roughness:.6 }), wdoor = std('#f7f4ec', { roughness:.5 });
   const top = std('#d9d2c3', { roughness:.35 }), steel = std('#c3c7ca', { roughness:.3, metalness:.25 }), grip = std('#8d9296', { roughness:.35, metalness:.3 }), dark = std('#1d1f22', { roughness:.4 }), wood = std('#9a6b3f');
   const tileTex = canvasTex(128, 128, (g, W, H) => { g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, W, H); g.strokeStyle = '#cbc3b2'; g.lineWidth = 3; g.strokeRect(0, 0, 64, 64); g.strokeRect(64, 0, 64, 64); g.strokeRect(-32, 64, 64, 64); g.strokeRect(32, 64, 64, 64); g.strokeRect(96, 64, 64, 64); });
@@ -546,9 +745,9 @@ function buildDoors(room){
   for(const dr of room.doors){
     const to = roomById(dr.to); if(!to) continue;
     const p = doorPos(room, dr.wall), n = wallNormal(dr.wall);
-    const g = new THREE.Group(); g.position.copy(p).addScaledVector(n, .03); g.lookAt(p.clone().add(n)); roomGroup.add(g);
+    const g = new THREE.Group(); g.position.copy(p).addScaledVector(n, .06); g.lookAt(p.clone().add(n)); roomGroup.add(g);
     const open = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.1), new THREE.MeshBasicMaterial({ color:'#070505' })); open.position.y = 1.05; g.add(open);
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.9), new THREE.MeshBasicMaterial({ color:THEMES[to.theme]?.wall || '#5fd0c5', transparent:true, opacity:.28 })); glow.position.set(0, 1.05, .005); g.add(glow);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.9), new THREE.MeshBasicMaterial({ color:lookOf(to).wall || '#5fd0c5', transparent:true, opacity:.28 })); glow.position.set(0, 1.05, .005); g.add(glow);
     const fm = std('#b8892f', { metalness:.5, roughness:.4 });
     for(const [x, y, w, h] of [[-.6,1.08,.1,2.2],[.6,1.08,.1,2.2],[0,2.2,1.3,.1]]){ const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, .08), fm); b.position.set(x, y, 0); g.add(b); }
     const lab = textSprite('To ' + to.name, { size:36 }); lab.position.set(0, 2.5, .1); g.add(lab);
@@ -572,21 +771,22 @@ async function buildRoom(room){
   disposeGroup(roomGroup); disposeGroup(fxGroup);
   if(splatRoot){ scene.remove(splatRoot); splatRoot.traverse(o => o.dispose && o.dispose()); splatRoot = null; }
   pickables = []; colliders = []; doorHits = []; slots = []; colliderMeshes = null; cur = room;
-  const { w, d, h } = room, T = THEMES[room.theme] || THEMES.gallery, isSplat = !!room.splat;
-  roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55));
+  const { w, d, h } = room, T = lookOf(room), isSplat = !!room.splat;
+  roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55 * (T.dim || 1)));
   const hide = isSplat ? { transparent:true, opacity:0, depthWrite:false } : {};
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std('#ffffff', { map:isSplat ? null : floorTex(T.floor, T.fc, w, d), ...hide }));
   floor.rotation.x = -Math.PI / 2; roomGroup.add(floor); pickables.push(floor);
-  const wm = std(T.wall, { ...hide, side:THREE.FrontSide });
+  const wmA = std(T.wall, { ...hide, side:THREE.FrontSide }), wmB = wmA.clone();
   for(const k of ['N','S','E','W']){
     const len = (k === 'N' || k === 'S') ? w : d;
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, h), wm); const p = doorPos(room, k), n = wallNormal(k);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, h), (k === 'N' || k === 'S') ? wmA : wmB); const p = doorPos(room, k), n = wallNormal(k);
     m.position.set(p.x, h / 2, p.z); m.lookAt(p.x + n.x, h / 2, p.z + n.z); roomGroup.add(m); pickables.push(m);
     if(!isSplat){ const b = new THREE.Mesh(new THREE.BoxGeometry(len, .12, .04), std(shade(T.wall, .6))); b.position.set(p.x + n.x * .02, .06, p.z + n.z * .02); b.lookAt(p.x + n.x, .06, p.z + n.z); roomGroup.add(b); }
   }
   if(!isSplat){
     const c = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std(T.ceil)); c.rotation.x = Math.PI / 2; c.position.y = h; roomGroup.add(c);
-    furnish(room);
+    decorate(room, T); furnish(room);
+    upgradeSurfaces(room, token, T, floor.material, wmA, wmB, c.material).catch(e => console.warn(e));
   }
   buildDoors(room);
   rebuildObjects(); rebuildRoute(); renderRooms(); drawMap();
@@ -971,7 +1171,7 @@ $('viewSave').onclick = () => { const name = $('viewName').value.trim() || `View
 
 /* room panel */
 function renderRoomPanel(){
-  $('rName').value = cur.name; $('pName').value = P.name; const s = cur.splat; $('rSplat').style.display = s ? 'flex' : 'none';
+  $('rName').value = cur.name; $('pName').value = P.name; $('rDesc').value = cur.desc || ''; $('rDescL').style.display = $('rRebuild').style.display = cur.splat ? 'none' : ''; const s = cur.splat; $('rSplat').style.display = s ? 'flex' : 'none';
   if(s){ $('rScale').value = s.scale || 1; $('rScaleV').textContent = (s.scale || 1).toFixed(2) + '×'; $('rY').value = s.y || 0; $('rYV').textContent = (s.y || 0).toFixed(2) + ' m'; }
   $('rReal').classList.toggle('on', P.realFurniture !== false); $('rReal').textContent = P.realFurniture !== false ? 'Real furniture: on' : 'Real furniture: off'; $('rReal').style.display = cur.splat ? 'none' : '';
   $('rDelete').disabled = P.rooms.length < 2; $('rAdd').disabled = P.rooms.length >= MAX_ROOMS; resetArm();
@@ -983,6 +1183,7 @@ $('rTurn').onclick = () => { cur.splat.turn = ((cur.splat.turn || 0) + 1) % 4; a
 $('rScale').oninput = e => { cur.splat.scale = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rY').oninput = e => { cur.splat.y = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rAdd').onclick = openRoomModal;
+$('rRebuild').onclick = () => { const t = $('rDesc').value.trim(); if(!t){ toast('Type a description first, such as: bright modern bedroom.'); return; } const pr = parseRoomText(t); cur.desc = t; cur.theme = pr.theme; cur.style = pr.style; save(); toast((pr.known ? 'Rebuilt as: ' : 'Type not recognised, built a living room: ') + pr.summary, 4500); enterRoom(cur, { pos:pos.clone(), yaw, pitch }); };
 $('rReal').onclick = () => { P.realFurniture = P.realFurniture === false; save(); renderRoomPanel(); const at = { pos:pos.clone(), yaw, pitch }; enterRoom(cur, at); };
 let armed = null; function resetArm(){ armed = null; $('rDelete').textContent = 'Delete room'; $('pReset').textContent = 'Start over with the example'; }
 $('rDelete').onclick = () => {
@@ -1053,15 +1254,16 @@ function fillWalls(){ const r = roomById($('nFrom').value); $('nWall').innerHTML
 function openRoomModal(){
   if(P.rooms.length >= MAX_ROOMS){ toast(`This version holds ${MAX_ROOMS} rooms.`); return; }
   $('nName').value = ''; $('nSplat').value = ''; $('nCol').value = '';
-  $('nTheme').innerHTML = Object.entries(THEMES).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
-  const unused = Object.keys(THEMES).find(k => !P.rooms.some(r => r.theme === k)); if(unused) $('nTheme').value = unused;
+  $('nDesc').value = ''; prevRoom();
   const from = P.rooms.filter(r => freeWalls(r).length); $('nFrom').innerHTML = from.map(r => `<option value="${r.id}">${r.name}</option>`).join('') + '<option value="">No door yet</option>';
   if(from.some(r => r.id === cur.id)) $('nFrom').value = cur.id; fillWalls(); openModal('roomModal'); $('nName').focus();
 }
 $('nFrom').onchange = fillWalls;
+function prevRoom(){ const t = $('nDesc').value.trim(); if(!t){ $('nPrev').textContent = ''; return; } const r = parseRoomText(t); $('nPrev').textContent = (r.known ? 'Will build: ' : 'Room type not recognised, so this will be a living room: ') + r.summary; }
+$('nDesc').addEventListener('input', prevRoom);
 $('nCreate').onclick = async () => {
-  const theme = $('nTheme').value, [w, d] = SIZES[$('nSize').value]; const sf = $('nSplat').files[0], cf = $('nCol').files[0];
-  const room = { id:uid(), name:$('nName').value.trim() || (sf ? sf.name.replace(/\.[^.]+$/, '') : THEMES[theme].label), theme, w, d, h:3.2, doors:[] };
+  const desc = $('nDesc').value.trim(), pr = parseRoomText(desc || $('nName').value), theme = pr.theme, [w, d] = SIZES[$('nSize').value]; const sf = $('nSplat').files[0], cf = $('nCol').files[0];
+  const room = { id:uid(), name:$('nName').value.trim() || (sf ? sf.name.replace(/\.[^.]+$/, '') : THEMES[theme].label), theme, style:pr.style, desc, w, d, h:3.2, doors:[] };
   if(sf){ room.splat = { fileId:uid(), name:sf.name, flip:true, turn:0, scale:1, y:0 }; await filePut(room.splat.fileId, await sf.arrayBuffer()); if(cf){ room.splat.colId = uid(); await filePut(room.splat.colId, await cf.arrayBuffer()); } }
   const from = roomById($('nFrom').value), wall = $('nWall').value;
   if(from && wall){ from.doors.push({ wall, to:room.id }); room.doors.push({ wall:OPP[wall], to:from.id }); }
