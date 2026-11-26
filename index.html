@@ -83,6 +83,8 @@ h2{font-size:20px}
 .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;max-height:232px;overflow:auto}
 .libgrid button{padding:4px;display:flex;flex-direction:column;gap:3px;align-items:center;white-space:normal;font-size:11px;line-height:1.15;text-align:center}
 .libgrid button.on{background:rgba(217,164,65,.2)}
+#drop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,5,4,.72);font-family:var(--display);font-size:28px;border:3px dashed var(--brass);pointer-events:none}
+#drop.show{display:flex}
 .libgrid img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.06)}
 a{color:var(--brass)}
 .note{font-size:12px;color:var(--dim);border-left:2px solid var(--line);padding-left:9px;line-height:1.45}
@@ -107,7 +109,8 @@ a{color:var(--brass)}
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
-  "@sparkjsdev/spark":"https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.1.0/dist/spark.module.js"
+  "@sparkjsdev/spark":"https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.1.0/dist/spark.module.js",
+  "fflate":"https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
 }}
 </script>
 </head>
@@ -204,7 +207,12 @@ a{color:var(--brass)}
       <div class="small muted" id="libMsg"></div>
       <div class="small muted">Powered by <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a>. Free to use, no credit needed.</div>
     </div>
-    <label><span>Or use your own 3D model file (.glb)</span><input id="oFile" type="file" accept=".glb,.gltf,model/gltf-binary"></label>
+    <div id="mine" style="display:flex;flex-direction:column;gap:8px">
+      <div class="row"><span class="muted small grow" style="flex:1">Your models</span><button id="mineAdd" type="button">Add files</button><input id="mineFiles" type="file" multiple accept=".glb,.zip" style="display:none"></div>
+      <div id="mineGrid" class="libgrid"></div>
+      <div class="small muted" id="mineMsg">Download .glb models from any site, or a whole .zip pack, and drop them anywhere on this page. They stay on your shelf to reuse.</div>
+    </div>
+    <input id="oFile" type="file" style="display:none">
     <div class="note">Text-to-3D is not connected yet. With no model picked and no file, a stand-in shape carries your description as a label.</div>
     <div class="row"><span class="grow"></span><button data-cancel>Cancel</button><button id="oCreate" class="primary">Create and place</button></div>
   </div>
@@ -229,6 +237,7 @@ a{color:var(--brass)}
 </div>
 
 <div id="toast" class="glass" role="status"></div>
+<div id="drop">Drop to add to your models</div>
 <div id="stick"><i></i></div>
 <div id="fade"></div>
 
@@ -829,6 +838,7 @@ function placeholderModel(desc){
   return g;
 }
 async function parseAny(buf){
+  if(buf.pack && !buf.files) buf = { main:buf.main, files:(await fileGet(buf.pack)) || {} };
   if(buf.main){   // a .gltf with separate texture and data files, as the online library serves them
     const urls = {}, made = []; for(const [k, b] of Object.entries(buf.files)){ const u = URL.createObjectURL(new Blob([b])); urls[k] = u; made.push(u); }
     const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => { const key = decodeURIComponent(u).replace(/^(\.\/)+/, ''); return urls[key] || urls[key.split('/').pop()] || u; });
@@ -1200,7 +1210,7 @@ document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = closeModal);
 $('modalWrap').addEventListener('pointerdown', e => { if(e.target === $('modalWrap')) closeModal(); });
 
 /* online library (Poly Haven). Works where the page is allowed to reach other sites. */
-const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, loading:false, dead:false };
+const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, mine:null, loading:false, dead:false };
 async function libLoad(){
   if(lib.all || lib.loading || lib.dead) return; lib.loading = true; $('libMsg').textContent = 'Loading the library…';
   try{ const r = await fetch(PH + '/assets?t=models'); if(!r.ok) throw new Error(r.status); const all = await r.json(); lib.all = {}; for(const [id, a] of Object.entries(all)) if(a.type === undefined || a.type === 2) lib.all[id] = a; $('libMsg').textContent = ''; }
@@ -1216,7 +1226,7 @@ function libRender(){
     const b = document.createElement('button'); b.type = 'button'; if(id === lib.pick) b.classList.add('on');
     const im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = a.thumbnail_url || `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=128&height=128`;
     const t = document.createElement('span'); t.textContent = a.name; b.append(im, t);
-    b.onclick = () => { lib.pick = lib.pick === id ? null : id; libRender(); $('libMsg').textContent = lib.pick ? `Picked: ${a.name}` : ''; }; g.appendChild(b);
+    b.onclick = () => { lib.pick = lib.pick === id ? null : id; lib.mine = null; mineRender(); libRender(); $('libMsg').textContent = lib.pick ? `Picked: ${a.name}` : ''; }; g.appendChild(b);
   }
   if(!items.length) $('libMsg').textContent = 'No free model matches. Try a simpler word.'; else if(!lib.pick) $('libMsg').textContent = '';
 }
@@ -1228,13 +1238,68 @@ async function libFetch(id){
   await Promise.all(Object.entries(g.include || {}).map(async ([path, v]) => { files[path] = await get(v.url); }));
   return { main, files };
 }
-let libT = 0; $('libQ').addEventListener('input', () => { clearTimeout(libT); libT = setTimeout(libRender, 150); });
-$('bAddObj').onclick = () => { $('oDesc').value = ''; $('oNote').value = ''; $('oFile').value = ''; $('libQ').value = ''; lib.pick = null; openModal('objModal'); $('oDesc').focus(); libLoad().then(libRender); libRender(); };
+
+/* ---------- your own model shelf: dropped .glb files and .zip packs ---------- */
+let thumbR = null;
+async function thumbOf(m){
+  const saved = await fileGet('th_' + m.id); if(saved) return saved;
+  const buf = await fileGet(m.fileId); if(!buf) return null; const gl = await parseAny(buf);
+  if(!thumbR){ thumbR = new THREE.WebGLRenderer({ antialias:true, alpha:true, preserveDrawingBuffer:true }); thumbR.setSize(128, 128, false); thumbR.outputColorSpace = THREE.SRGBColorSpace; }
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight('#ffffff', '#555555', 2.2)); const dl = new THREE.DirectionalLight('#ffffff', 2); dl.position.set(2, 3, 4); sc.add(dl); sc.add(gl.scene);
+  const box = new THREE.Box3().setFromObject(gl.scene), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2 || 1;
+  const cam = new THREE.PerspectiveCamera(35, 1, r / 50, r * 20); cam.position.set(c.x + r * 1.5, c.y + r * 1.0, c.z + r * 2.0); cam.lookAt(c);
+  thumbR.render(sc, cam); const url = thumbR.domElement.toDataURL('image/png'); await filePut('th_' + m.id, url);
+  gl.scene.traverse(o => { if(o.geometry) o.geometry.dispose(); }); return url;
+}
+function mineRender(){
+  const g = $('mineGrid'); if(!g) return; g.innerHTML = ''; const all = P.models || [];
+  const q = ($('libQ').value.trim()).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 1);
+  const items = all.filter(m => !q.length || q.some(w => m.name.toLowerCase().includes(w))).slice(0, 60);
+  for(const m of items){
+    const b = document.createElement('button'); b.type = 'button'; if(m.id === lib.mine) b.classList.add('on');
+    const im = document.createElement('img'); im.alt = ''; const t = document.createElement('span'); t.textContent = m.name; b.append(im, t);
+    thumbOf(m).then(u => { if(u) im.src = u; }).catch(() => {});
+    b.onclick = () => { lib.mine = lib.mine === m.id ? null : m.id; lib.pick = null; libRender(); mineRender(); }; g.appendChild(b);
+  }
+  $('mineMsg').textContent = all.length ? `${all.length} on your shelf${items.length < all.length ? ', showing ' + items.length + '. Type above to search them.' : '.'} Drop more .glb files or .zip packs anywhere on the page.` : 'Download .glb models from any site, or a whole .zip pack, and drop them anywhere on this page. They stay on your shelf to reuse.';
+}
+const nice = n => n.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
+async function importFiles(files){
+  P.models = P.models || []; let added = 0, skipped = 0;
+  for(const f of files){
+    const ext = f.name.toLowerCase().split('.').pop();
+    try{
+      if(ext === 'glb'){ const m = { id:uid(), name:nice(f.name), fileId:uid() }; await filePut(m.fileId, await f.arrayBuffer()); P.models.push(m); added++; }
+      else if(ext === 'zip'){
+        toast('Unpacking ' + f.name + '…', 8000); const { unzipSync } = await import('fflate'); const ent = unzipSync(new Uint8Array(await f.arrayBuffer()));
+        const side = {}, packId = 'pk_' + uid(), glbs = [];
+        for(const [path, data] of Object.entries(ent)){ if(!data.length) continue; const e = path.toLowerCase().split('.').pop(); const base = path.split('/').pop(); const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+          if(e === 'glb' || e === 'gltf') glbs.push([path, ab]); else if(['png','jpg','jpeg','webp','bin','ktx2'].includes(e)){ side[path] = ab; side[base] = ab; const parts = path.split('/'); if(parts.length > 1) side[parts.slice(-2).join('/')] = ab; } }
+        const hasSide = Object.keys(side).length > 0; if(hasSide) await filePut(packId, side);
+        for(const [path, ab] of glbs.slice(0, 400)){ const m = { id:uid(), name:nice(path.split('/').pop()), fileId:uid() }; await filePut(m.fileId, hasSide ? { main:ab, pack:packId } : ab); P.models.push(m); added++; }
+        if(glbs.length > 400) skipped += glbs.length - 400; if(!glbs.length) skipped++;
+      } else skipped++;
+    }catch(e){ console.warn('import', f.name, e); skipped++; }
+  }
+  save(); mineRender();
+  toast(added ? `${added} model${added > 1 ? 's' : ''} added to your shelf.${skipped ? ' ' + skipped + ' file(s) skipped: only .glb files and .zip packs of them work.' : ''} Open + Object to place them.` : 'Nothing was added. Only .glb files, or .zip packs containing them, work here.', 5200);
+}
+$('mineAdd').onclick = () => $('mineFiles').click();
+$('mineFiles').addEventListener('change', e => { if(e.target.files.length) importFiles([...e.target.files]); e.target.value = ''; });
+let dragN = 0;
+window.addEventListener('dragenter', e => { if(e.dataTransfer && [...e.dataTransfer.types].includes('Files')){ dragN++; $('drop').classList.add('show'); } });
+window.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if(!dragN) $('drop').classList.remove('show'); });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('drop').classList.remove('show'); if(e.dataTransfer && e.dataTransfer.files.length) importFiles([...e.dataTransfer.files]); });
+
+let libT = 0; $('libQ').addEventListener('input', () => { clearTimeout(libT); libT = setTimeout(() => { libRender(); mineRender(); }, 150); });
+$('bAddObj').onclick = () => { $('oDesc').value = ''; $('oNote').value = ''; $('oFile').value = ''; $('libQ').value = ''; lib.pick = null; lib.mine = null; openModal('objModal'); $('oDesc').focus(); libLoad().then(libRender); libRender(); mineRender(); };
 $('oDesc').addEventListener('input', () => { if(!$('libQ').value){ clearTimeout(libT); libT = setTimeout(libRender, 250); } });
 $('oCreate').onclick = async () => {
-  const f = $('oFile').files[0]; const desc = $('oDesc').value.trim() || (f ? f.name.replace(/\.[^.]+$/, '') : '') || (lib.pick && lib.all ? lib.all[lib.pick].name : ''); if(!desc){ $('oDesc').focus(); toast('Describe the object first.'); return; }
+  const f = $('oFile').files[0]; const desc = $('oDesc').value.trim() || (f ? f.name.replace(/\.[^.]+$/, '') : '') || (lib.mine ? ((P.models || []).find(x => x.id === lib.mine) || {}).name || '' : '') || (lib.pick && lib.all ? lib.all[lib.pick].name : ''); if(!desc){ $('oDesc').focus(); toast('Describe the object first.'); return; }
   const o = { id:uid(), room:cur.id, desc, note:$('oNote').value.trim(), rotY:yaw, scale:1, wallN:null, pos:[0,0,0] };
   if(f){ o.fileId = uid(); await filePut(o.fileId, await f.arrayBuffer()); }
+  else if(lib.mine){ const m = (P.models || []).find(x => x.id === lib.mine); if(m){ o.fileId = m.fileId; o.real = true; o.src = 'Your model: ' + m.name; } }
   else if(lib.pick){
     $('oCreate').disabled = true; $('libMsg').textContent = 'Fetching the model…';
     try{ const b = await libFetch(lib.pick); o.fileId = uid(); o.real = true; o.src = 'Poly Haven: ' + lib.pick; await filePut(o.fileId, b); }
