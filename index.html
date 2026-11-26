@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Memory Palace Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* One visual world: a lamp-lit house at night. The 3D view fills the screen;
+   controls sit on thin dark glass at the edges so the room stays the subject. */
+:root{
+  color-scheme: dark;
+  --ink:#16110f;          /* page and panel base */
+  --glass:rgba(24,18,16,.82);
+  --line:rgba(226,200,150,.22);
+  --paper:#efe4cf;        /* primary text */
+  --dim:#b3a48c;          /* secondary text */
+  --brass:#d9a441;        /* accent: numbers, primary actions */
+  --route:#5fd0c5;        /* the route glow, used only for route things */
+  --danger:#e07a5f;
+  --display:"Cormorant Garamond", Georgia, serif;
+  --body:"Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:14px;overflow:hidden;-webkit-tap-highlight-color:transparent}
+canvas#view{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:rgba(255,240,210,.07);border:1px solid var(--line);border-radius:8px;padding:7px 11px;line-height:1.1;white-space:nowrap}
+button:hover{background:rgba(255,240,210,.14)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--brass);outline-offset:1px}
+button.primary{background:var(--brass);color:#1c1408;border-color:transparent;font-weight:600}
+button.primary:hover{background:#e7b556}
+button.on{border-color:var(--brass);color:var(--brass)}
+button.danger{color:var(--danger)}
+button:disabled{opacity:.4;cursor:default}
+input[type=text],select,textarea{background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+textarea{resize:vertical;min-height:54px}
+label{display:flex;flex-direction:column;gap:5px;color:var(--dim);font-size:12px}
+label>span{letter-spacing:.02em}
+.glass{background:var(--glass);border:1px solid var(--line);border-radius:var(--r);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+h1,h2{font-family:var(--display);font-weight:600;margin:0;text-wrap:balance}
+h1{font-size:21px;letter-spacing:.01em}
+h2{font-size:20px}
+.muted{color:var(--dim)}
+.small{font-size:12px}
+
+#top{position:fixed;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+#top>*{pointer-events:auto}
+#brand{padding:7px 12px;display:flex;align-items:baseline;gap:10px}
+#rooms{display:flex;gap:6px;padding:5px;flex-wrap:wrap;max-width:100%}
+#rooms button{padding:6px 10px}
+#rooms button.on{background:rgba(217,164,65,.16)}
+#tools{margin-left:auto;display:flex;gap:6px;padding:5px;flex-wrap:wrap}
+
+#bottom{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;padding:6px;max-width:calc(100% - 20px);flex-wrap:wrap;justify-content:center}
+#count{min-width:86px;text-align:center;font-variant-numeric:tabular-nums;color:var(--dim)}
+#count b{color:var(--paper);font-weight:600}
+#pace{width:74px;accent-color:var(--brass)}
+
+#card{position:fixed;left:10px;bottom:70px;width:min(330px,calc(100% - 20px));padding:12px;display:none;flex-direction:column;gap:9px;max-height:calc(100% - 150px);overflow:auto}
+#card.show{display:flex}
+#card .head{display:flex;gap:9px;align-items:flex-start}
+.num{flex:none;width:30px;height:30px;border-radius:50%;background:var(--brass);color:#1c1408;font-weight:600;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+#cardDesc{font-family:var(--display);font-size:19px;line-height:1.15;flex:1;overflow-wrap:anywhere}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.row .grow{flex:1}
+#noteView{background:rgba(0,0,0,.3);border-radius:8px;padding:9px 10px;border-left:3px solid var(--brass);overflow-wrap:anywhere}
+
+.panel{position:fixed;right:10px;top:64px;width:min(340px,calc(100% - 20px));max-height:calc(100% - 150px);overflow:auto;padding:12px;display:none;flex-direction:column;gap:10px}
+.panel.show{display:flex}
+.panel .head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#mapCanvas{width:100%;border-radius:8px;background:rgba(0,0,0,.35);display:block;cursor:pointer}
+.list{display:flex;flex-direction:column;gap:4px}
+.list button{text-align:left;white-space:normal;display:flex;gap:8px;align-items:center}
+.list .num{width:22px;height:22px;font-size:12px}
+
+#modalWrap{position:fixed;inset:0;background:rgba(8,5,4,.6);display:none;align-items:center;justify-content:center;padding:16px}
+#modalWrap.show{display:flex}
+.modal{width:min(430px,100%);max-height:100%;overflow:auto;padding:16px;display:none;flex-direction:column;gap:12px}
+.modal.show{display:flex}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;max-height:232px;overflow:auto}
+.libgrid button{padding:4px;display:flex;flex-direction:column;gap:3px;align-items:center;white-space:normal;font-size:11px;line-height:1.15;text-align:center}
+.libgrid button.on{background:rgba(217,164,65,.2)}
+.libgrid img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.06)}
+a{color:var(--brass)}
+.note{font-size:12px;color:var(--dim);border-left:2px solid var(--line);padding-left:9px;line-height:1.45}
+
+#hint{position:fixed;left:50%;top:70px;transform:translateX(-50%);padding:9px 12px;display:flex;gap:10px;align-items:center;max-width:calc(100% - 20px)}
+#toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);padding:8px 12px;display:none;max-width:calc(100% - 20px);text-align:center}
+#fade{position:fixed;inset:0;background:#0b0807;opacity:0;pointer-events:none;transition:opacity .22s}
+#stick{position:fixed;width:96px;height:96px;border-radius:50%;border:1px solid var(--line);background:rgba(255,240,210,.06);display:none;pointer-events:none}
+#stick i{position:absolute;left:50%;top:50%;width:38px;height:38px;margin:-19px;border-radius:50%;background:rgba(217,164,65,.55)}
+@media (max-width:640px){
+  #brand .muted{display:none}
+  #tools{margin-left:0}
+  #card{bottom:66px}
+  .lg{display:none !important}
+  #bottom{flex-wrap:nowrap}
+  #count{min-width:64px}
+  #hint{top:auto;bottom:66px;width:calc(100% - 20px)}
+}
+@media (prefers-reduced-motion:reduce){#fade{transition:none}}
+</style>
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
+  "@sparkjsdev/spark":"https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.1.0/dist/spark.module.js"
+}}
+</script>
+</head>
+<body>
+<canvas id="view" tabindex="0" aria-label="3D view of the current room"></canvas>
+
+<div id="top">
+  <div id="brand" class="glass"><h1 id="palaceName">My palace</h1><span class="muted small" id="roomCount"></span></div>
+  <div id="rooms" class="glass" role="tablist" aria-label="Rooms"></div>
+  <div id="tools" class="glass">
+    <button id="bAddObj" class="primary">+ Object</button>
+    <button id="bMap">Map</button>
+    <button id="bFind">Find</button>
+    <button id="bViews">Views</button>
+    <button id="bRoom">Room</button>
+  </div>
+</div>
+
+<div id="hint" class="glass"><span id="hintText">Drag to look around. Walk with W A S D or the arrow keys. Click the floor to glide there.</span><button id="hintOk">Got it</button></div>
+
+<div id="card" class="glass" aria-live="polite">
+  <div class="head"><div class="num" id="cardNum">1</div><div id="cardDesc"></div><button id="cardClose" aria-label="Close">✕</button></div>
+  <div id="noteView"></div>
+  <button id="reveal" style="display:none">Show what it stands for</button>
+  <div id="editBox" style="display:none;flex-direction:column;gap:9px">
+    <label><span>What this object stands for</span><textarea id="noteEdit"></textarea></label>
+    <div class="row">
+      <button id="eMove" class="primary">Move</button>
+      <button id="eRotL" aria-label="Rotate left">⟲</button><button id="eRotR" aria-label="Rotate right">⟳</button>
+      <button id="eSmaller" aria-label="Smaller">−</button><button id="eBigger" aria-label="Bigger">+</button>
+      <button id="eDown" aria-label="Lower">↓</button><button id="eUp" aria-label="Raise">↑</button>
+    </div>
+    <div class="row">
+      <button id="eSnap" class="on">Snap to surfaces</button>
+      <button id="eEarlier">Earlier in route</button><button id="eLater">Later</button>
+      <span class="grow"></span><button id="eDelete" class="danger">Delete</button>
+    </div>
+  </div>
+  <div class="row"><button id="cardEdit">Edit</button><span class="muted small" id="cardRoom"></span></div>
+</div>
+
+<div id="bottom" class="glass">
+  <button id="bPrev" aria-label="Previous spot">◀<span class="lg"> Previous</span></button>
+  <div id="count"><b>–</b> of 0</div>
+  <button id="bNext" class="primary" aria-label="Next spot"><span class="lg">Next </span>▶</button>
+  <button id="bTour">Tour</button>
+  <label class="lg" style="flex-direction:row;align-items:center;gap:6px"><span>Pace</span><input id="pace" type="range" min="2" max="10" step="1" value="4"></label>
+  <button id="bQuiz" title="Hide the notes so you can test yourself">Hide notes</button>
+</div>
+
+<div id="mapPanel" class="panel glass">
+  <div class="head"><h2>Palace map</h2><button data-close="mapPanel" aria-label="Close">✕</button></div>
+  <canvas id="mapCanvas" width="632" height="440"></canvas>
+  <div class="small muted">Click a room or a numbered spot to go there.</div>
+</div>
+
+<div id="findPanel" class="panel glass">
+  <div class="head"><h2>Find</h2><button data-close="findPanel" aria-label="Close">✕</button></div>
+  <input id="findInput" type="text" placeholder="trumpet, item 7, kitchen…" autocomplete="off">
+  <div id="findList" class="list"></div>
+</div>
+
+<div id="viewsPanel" class="panel glass">
+  <div class="head"><h2>Saved views</h2><button data-close="viewsPanel" aria-label="Close">✕</button></div>
+  <div class="row"><input id="viewName" type="text" class="grow" style="flex:1;width:auto" placeholder="Name this view"><button id="viewSave" class="primary">Save</button></div>
+  <div id="viewList" class="list"></div>
+</div>
+
+<div id="roomPanel" class="panel glass">
+  <div class="head"><h2>This room</h2><button data-close="roomPanel" aria-label="Close">✕</button></div>
+  <label><span>Name</span><input id="rName" type="text"></label>
+  <div id="rSplat" style="display:none;flex-direction:column;gap:9px">
+    <div class="row"><button id="rFlip">Flip upside down</button><button id="rTurn">Turn 90°</button></div>
+    <label><span>Size of the scene: <b id="rScaleV"></b></span><input id="rScale" type="range" min="0.2" max="5" step="0.05"></label>
+    <label><span>Floor height: <b id="rYV"></b></span><input id="rY" type="range" min="-3" max="3" step="0.05"></label>
+  </div>
+  <div class="row"><button id="rAdd" class="primary">+ Add a room</button><span class="grow"></span><button id="rDelete" class="danger">Delete room</button></div>
+  <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0">
+  <label><span>Palace name</span><input id="pName" type="text"></label>
+  <div class="row"><button id="pReset" class="danger">Start over with the example</button></div>
+  <div class="note">Everything is saved in this browser on this device. Sharing by link arrives with the server phase.</div>
+</div>
+
+<div id="modalWrap">
+  <div id="objModal" class="modal glass" role="dialog" aria-labelledby="objT">
+    <h2 id="objT">New object</h2>
+    <label><span>Describe it. Strange and vivid is easier to remember.</span><input id="oDesc" type="text" placeholder="a giant brass trumpet with a cat sitting inside"></label>
+    <label><span>What it stands for</span><input id="oNote" type="text" placeholder="the word, fact or list item"></label>
+    <div id="lib" style="display:flex;flex-direction:column;gap:8px">
+      <label><span>Pick a free 3D model</span><input id="libQ" type="text" placeholder="chair, lantern, skull, teapot…" autocomplete="off"></label>
+      <div id="libGrid" class="libgrid"></div>
+      <div class="small muted" id="libMsg"></div>
+      <div class="small muted">Powered by <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a>. Free to use, no credit needed.</div>
+    </div>
+    <label><span>Or use your own 3D model file (.glb)</span><input id="oFile" type="file" accept=".glb,.gltf,model/gltf-binary"></label>
+    <div class="note">Text-to-3D is not connected yet. With no model picked and no file, a stand-in shape carries your description as a label.</div>
+    <div class="row"><span class="grow"></span><button data-cancel>Cancel</button><button id="oCreate" class="primary">Create and place</button></div>
+  </div>
+  <div id="roomModal" class="modal glass" role="dialog" aria-labelledby="roomT">
+    <h2 id="roomT">New room</h2>
+    <label><span>Name</span><input id="nName" type="text" placeholder="Kitchen"></label>
+    <div class="row">
+      <label class="grow" style="flex:1"><span>Style</span><select id="nTheme"></select></label>
+      <label class="grow" style="flex:1"><span>Size</span><select id="nSize"><option value="S">Small, 6 × 6 m</option><option value="M" selected>Medium, 8 × 7 m</option><option value="L">Large, 11 × 9 m</option></select></label>
+    </div>
+    <div class="row">
+      <label class="grow" style="flex:1"><span>Door from</span><select id="nFrom"></select></label>
+      <label class="grow" style="flex:1"><span>On its</span><select id="nWall"></select></label>
+    </div>
+    <label><span>Or use a generated or scanned room file (.spz, .ply, .splat, .ksplat, .sog)</span><input id="nSplat" type="file" accept=".spz,.ply,.splat,.ksplat,.sog"></label>
+    <label><span>Its walls-and-floor file, if it came with one (.glb)</span><input id="nCol" type="file" accept=".glb"></label>
+    <div class="note">Text-to-room is not connected yet. Built-in styles are stand-ins. A room file from a generator such as Hunyuan World or Atlas loads as the real photoreal room.</div>
+    <div class="row"><span class="grow"></span><button data-cancel>Cancel</button><button id="nCreate" class="primary">Create room</button></div>
+  </div>
+</div>
+
+<div id="toast" class="glass" role="status"></div>
+<div id="stick"><i></i></div>
+<div id="fade"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const $ = id => document.getElementById(id);
+const EYE = 1.6, MAX_ROOMS = 5, KEY = 'mpb.palace.v1';
+const WALLS = { N:'north', E:'east', S:'south', W:'west' };
+const OPP = { N:'S', S:'N', E:'W', W:'E' };
+const SIZES = { S:[6,6], M:[8,7], L:[11,9] };
+const THEMES = {
+  library:{ label:'Library', floor:'planks', fc:'#5b3b24', wall:'#2e4a40', ceil:'#211a15', light:'#ffcf8a' },
+  kitchen:{ label:'Kitchen', floor:'tiles', fc:'#c9b28f', wall:'#e6dac2', ceil:'#f1eadb', light:'#fff1d6' },
+  gallery:{ label:'Gallery', floor:'planks', fc:'#b89a74', wall:'#ebe6dd', ceil:'#f4f1ea', light:'#ffffff' },
+  garden:{ label:'Garden room', floor:'stone', fc:'#8d8a80', wall:'#a3baa2', ceil:'#dfe8dd', light:'#f3ffe8' },
+  vault:{ label:'Stone vault', floor:'stone', fc:'#4c4a50', wall:'#55525c', ceil:'#2c2a30', light:'#ffd9a0' }
+};
+
+/* ---------- storage ---------- */
+const uid = () => Math.random().toString(36).slice(2, 10);
+function lsGet(){ try{ return JSON.parse(localStorage.getItem(KEY)); }catch(e){ return null; } }
+function lsSet(v){ try{ localStorage.setItem(KEY, JSON.stringify(v)); }catch(e){} }
+let dbp = null;
+function idb(){
+  if(dbp) return dbp;
+  dbp = new Promise((res, rej) => {
+    try{
+      const r = indexedDB.open('mpb-files', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('f');
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    }catch(e){ rej(e); }
+  });
+  return dbp;
+}
+const memFiles = new Map();
+async function filePut(id, buf){
+  memFiles.set(id, buf);
+  try{ const d = await idb(); await new Promise((res, rej) => { const t = d.transaction('f','readwrite'); t.objectStore('f').put(buf, id); t.oncomplete = res; t.onerror = () => rej(t.error); }); }catch(e){}
+}
+async function fileGet(id){
+  if(memFiles.has(id)) return memFiles.get(id);
+  try{ const d = await idb(); return await new Promise((res, rej) => { const q = d.transaction('f').objectStore('f').get(id); q.onsuccess = () => res(q.result || null); q.onerror = () => rej(q.error); }); }catch(e){ return null; }
+}
+
+/* ---------- palace data ---------- */
+function examplePalace(){
+  const a = uid(), b = uid(), o1 = uid(), o2 = uid(), o3 = uid();
+  return {
+    name:'My palace',
+    rooms:[
+      { id:a, name:'Library', theme:'library', w:8, d:7, h:3.2, doors:[{ wall:'E', to:b }] },
+      { id:b, name:'Kitchen', theme:'kitchen', w:8, d:7, h:3.2, doors:[{ wall:'W', to:a }] }
+    ],
+    objects:[
+      { id:o1, room:a, desc:'Example: a thermometer wearing a scarf', note:'Mercury, the closest planet to the Sun', pos:[-2.2,0,1.2], rotY:0, scale:1, wallN:null },
+      { id:o2, room:a, desc:'Example: a hand mirror covered in clouds', note:'Venus, hidden under thick cloud', pos:[0,0.78,-0.4], rotY:0, scale:.7, wallN:null },
+      { id:o3, room:b, desc:'Example: a blue marble the size of a melon', note:'Earth', pos:[0,0.94,0], rotY:0, scale:.7, wallN:null }
+    ],
+    route:[o1,o2,o3], bookmarks:[]
+  };
+}
+let P = lsGet();
+if(!P || !P.rooms || !P.rooms.length) P = examplePalace();
+let saveT = 0;
+function save(){ clearTimeout(saveT); saveT = setTimeout(() => lsSet(P), 250); }
+const roomById = id => P.rooms.find(r => r.id === id);
+const objById = id => P.objects.find(o => o.id === id);
+const locusNo = id => P.route.indexOf(id) + 1;
+
+/* ---------- three setup ---------- */
+const canvas = $('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0d0a09');
+const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 200);
+camera.rotation.order = 'YXZ';
+const roomGroup = new THREE.Group(), objGroup = new THREE.Group(), fxGroup = new THREE.Group();
+scene.add(roomGroup, objGroup, fxGroup);
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+
+/* ---------- small helpers ---------- */
+function canvasTex(w, h, draw, rx = 1, ry = 1){
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; return t;
+}
+function shade(hex, f){ const c = new THREE.Color(hex); c.multiplyScalar(f); return '#' + c.getHexString(); }
+function floorTex(kind, col, w, d){
+  return canvasTex(256, 256, (g, W, H) => {
+    g.fillStyle = col; g.fillRect(0, 0, W, H);
+    if(kind === 'planks'){
+      for(let i = 0; i < 8; i++){ g.fillStyle = shade(col, .82 + ((i * 37) % 9) / 30); g.fillRect(0, i * 32, W, 31); g.fillStyle = shade(col, .55); g.fillRect(((i * 97) % 200), i * 32, 2, 31); }
+    } else if(kind === 'tiles'){
+      for(let y = 0; y < 4; y++) for(let x = 0; x < 4; x++){ g.fillStyle = (x + y) % 2 ? shade(col, .78) : shade(col, 1.08); g.fillRect(x * 64 + 1, y * 64 + 1, 62, 62); }
+    } else {
+      for(let i = 0; i < 60; i++){ g.fillStyle = shade(col, .8 + ((i * 53) % 40) / 100); const x = (i * 71) % W, y = (i * 113) % H; g.fillRect(x, y, 30 + (i * 7) % 50, 20 + (i * 11) % 40); }
+      g.strokeStyle = shade(col, .6); g.lineWidth = 2; for(let i = 0; i <= 2; i++){ g.strokeRect(0, i * 128, W, 128); g.strokeRect(i * 128, 0, 128, H); }
+    }
+  }, w / 2, d / 2);
+}
+function booksTex(){
+  return canvasTex(256, 256, (g, W, H) => {
+    g.fillStyle = '#2a1a10'; g.fillRect(0, 0, W, H);
+    const cols = ['#7a2e2e','#2f5d50','#c9a24b','#3b4a6b','#8a5a2b','#5b2b4a','#d8cdb5'];
+    for(let r = 0; r < 4; r++){ let x = 4; let i = r * 5; while(x < W - 8){ const bw = 8 + (i * 13) % 14; g.fillStyle = cols[i % cols.length]; g.fillRect(x, r * 64 + 8 + (i * 5) % 8, bw, 52 - (i * 5) % 8); x += bw + 2; i++; } g.fillStyle = '#4a2f1c'; g.fillRect(0, r * 64 + 60, W, 4); }
+  });
+}
+function textSprite(text, { size = 34, color = '#efe4cf', bg = 'rgba(20,14,12,.78)', max = 26, fixed = false } = {}){
+  const t = text.length > max ? text.slice(0, max - 1) + '…' : text;
+  const c = document.createElement('canvas'); const g = c.getContext('2d');
+  g.font = `600 ${size}px Figtree, system-ui, sans-serif`;
+  const w = Math.ceil(g.measureText(t).width) + 28; c.width = w; c.height = size + 22;
+  g.font = `600 ${size}px Figtree, system-ui, sans-serif`;
+  g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, c.width, c.height, 12); g.fill();
+  g.fillStyle = color; g.textBaseline = 'middle'; g.fillText(t, 14, c.height / 2 + 1);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true, sizeAttenuation:!fixed }));
+  if(fixed) s.scale.set(.034 * c.width / c.height, .034, 1); else s.scale.set(c.width / 300, c.height / 300, 1);
+  s.renderOrder = 10; return s;
+}
+function numberSprite(n){
+  const c = document.createElement('canvas'); c.width = c.height = 96; const g = c.getContext('2d');
+  g.fillStyle = '#d9a441'; g.beginPath(); g.arc(48, 48, 44, 0, 7); g.fill();
+  g.fillStyle = '#1c1408'; g.font = '700 50px Figtree, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(n), 48, 51);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true, sizeAttenuation:false }));
+  s.scale.set(.05, .05, 1); s.renderOrder = 11; return s;
+}
+function hash(s){ let h = 2166136261; for(let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function toast(msg, ms = 2600){ const t = $('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', ms); }
+function disposeGroup(g){
+  g.traverse(o => { if(o.geometry) o.geometry.dispose(); if(o.material){ (Array.isArray(o.material) ? o.material : [o.material]).forEach(m => { if(m.map) m.map.dispose(); m.dispose(); }); } });
+  g.clear();
+}
+
+/* ---------- room building ---------- */
+let cur = null;                 // current room record
+let pickables = [];             // meshes that can be clicked, walked to, snapped onto
+let colliders = [];             // furniture boxes {min:[x,z], max:[x,z]}
+let doorHits = [];              // door meshes
+let colliderMeshes = null;      // from a room file's walls-and-floor file
+let splatRoot = null, spark = null, buildToken = 0;
+
+function doorPos(room, wall){
+  const hw = room.w / 2, hd = room.d / 2;
+  return wall === 'N' ? new THREE.Vector3(0, 0, -hd) : wall === 'S' ? new THREE.Vector3(0, 0, hd) : wall === 'E' ? new THREE.Vector3(hw, 0, 0) : new THREE.Vector3(-hw, 0, 0);
+}
+function wallNormal(wall){ return wall === 'N' ? new THREE.Vector3(0,0,1) : wall === 'S' ? new THREE.Vector3(0,0,-1) : wall === 'E' ? new THREE.Vector3(-1,0,0) : new THREE.Vector3(1,0,0); }
+
+function addBox(x, y, z, w, h, d, mat, { collide = true, pick = true } = {}){
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); roomGroup.add(m);
+  if(pick) pickables.push(m);
+  if(collide && y - h / 2 < 1.5) colliders.push({ min:[x - w / 2, z - d / 2], max:[x + w / 2, z + d / 2] });
+  return m;
+}
+const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness:.85, metalness:0, ...o });
+
+function furnish(room){
+  const { w, d, theme } = room, hw = w / 2, hd = d / 2;
+  const lamp = (x, y, z, col, power = 9) => { const l = new THREE.PointLight(col, power, 14, 1.6); l.position.set(x, y, z); roomGroup.add(l); const b = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), new THREE.MeshBasicMaterial({ color:col })); b.position.copy(l.position); roomGroup.add(b); };
+  const T = THEMES[theme];
+  if(theme === 'library'){
+    const sw = hw - 1.3, bt = booksTex();
+    for(const sx of [-1, 1]){ const m = std('#ffffff', { map:bt.clone() }); m.map.repeat.set(sw / 1.6, 1.4); m.map.needsUpdate = true; addBox(sx * (.9 + sw / 2), 1.3, -hd + .22, sw, 2.6, .44, m); }
+    addBox(-hw + .22, 1.3, hd / 2 - .2, .44, 2.6, hd - 1.4, std('#3a2415'));
+    addBox(0, .02, .4, 3.2, .03, 2.2, std('#7a2622'), { collide:false });
+    addBox(0, .74, -.4, 1.5, .08, .8, std('#4a2f1c')); for(const [x, z] of [[-.65,-.72],[.65,-.72],[-.65,-.08],[.65,-.08]]) addBox(x, .35, z, .08, .7, .08, std('#3a2415'), { collide:false, pick:false });
+    addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'));
+    lamp(-hw + 1.2, 2.3, 0, T.light); lamp(hw - 1.4, 2.3, hd - 1.4, T.light); lamp(0, 1.25, -.4, '#ffb766', 4);
+  } else if(theme === 'kitchen'){
+    addBox(hw / 2 + .2, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')); addBox(hw / 2 + .2, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'));
+    addBox(-hw / 2 - .2, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')); addBox(-hw / 2 - .2, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'));
+    addBox(0, .45, 0, 1.8, .9, .9, std('#8b5e3c')); addBox(0, .92, 0, 2, .05, 1.05, std('#d8cbb0'));
+    addBox(-hw / 2 - .2, 1.75, -hd + .16, hw - 1.8, .05, .3, std('#8b5e3c'), { collide:false });
+    addBox(hw - .5, 1, hd - 1.4, .8, 2, .8, std('#d9d6cf'));
+    lamp(0, 2.4, 0, T.light, 12); lamp(-hw + 1.5, 2.4, hd - 1.5, T.light, 7);
+  } else if(theme === 'gallery'){
+    for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]) addBox(x, .5, z, .6, 1, .6, std('#f5f2ec'));
+    addBox(0, .23, 0, 1.8, .46, .5, std('#3b3a38'));
+    lamp(-hw / 2, 2.7, 0, T.light, 10); lamp(hw / 2, 2.7, 0, T.light, 10);
+  } else if(theme === 'garden'){
+    for(const [x, z] of [[-hw + .6, -hd + .6],[hw - .6, -hd + .6],[-hw + .6, hd - .6],[hw - .6, hd - .6]]){ addBox(x, .3, z, .8, .6, .8, std('#a0593a')); const b = new THREE.Mesh(new THREE.SphereGeometry(.55, 14, 10), std('#3f7a45')); b.position.set(x, 1, z); roomGroup.add(b); pickables.push(b); }
+    const f = new THREE.Mesh(new THREE.CylinderGeometry(.9, 1, .5, 24), std('#b9b6ad')); f.position.set(0, .25, 0); roomGroup.add(f); pickables.push(f); colliders.push({ min:[-1,-1], max:[1,1] });
+    const wtr = new THREE.Mesh(new THREE.CylinderGeometry(.78, .78, .04, 24), std('#5aa7b8', { roughness:.2 })); wtr.position.set(0, .5, 0); roomGroup.add(wtr);
+    addBox(-hw / 2, .23, hd - .5, 1.4, .46, .4, std('#7b5a3a'));
+    lamp(0, 2.7, 0, T.light, 14); lamp(hw - 1.5, 2.2, -hd + 1.5, '#fff3c4', 6);
+  } else {
+    for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]){ const c = new THREE.Mesh(new THREE.CylinderGeometry(.28, .32, room.h, 14), std('#6b6872')); c.position.set(x, room.h / 2, z); roomGroup.add(c); pickables.push(c); colliders.push({ min:[x - .32, z - .32], max:[x + .32, z + .32] }); }
+    addBox(0, .3, -hd + .7, 1.2, .6, .7, std('#5a3d22')); addBox(0, .63, -hd + .7, 1.24, .06, .74, std('#c39a3d'));
+    addBox(hw - .7, .45, 0, .7, .9, 1.6, std('#3d3b42'));
+    lamp(0, 2.3, 0, T.light, 9); lamp(-hw + 1, 1.8, hd - 1, '#ff9d4d', 6);
+  }
+}
+
+function buildDoors(room){
+  for(const dr of room.doors){
+    const to = roomById(dr.to); if(!to) continue;
+    const p = doorPos(room, dr.wall), n = wallNormal(dr.wall);
+    const g = new THREE.Group(); g.position.copy(p).addScaledVector(n, .03); g.lookAt(p.clone().add(n)); roomGroup.add(g);
+    const open = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 2.1), new THREE.MeshBasicMaterial({ color:'#070505' })); open.position.y = 1.05; g.add(open);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(.9, 1.9), new THREE.MeshBasicMaterial({ color:THEMES[to.theme]?.wall || '#5fd0c5', transparent:true, opacity:.28 })); glow.position.set(0, 1.05, .005); g.add(glow);
+    const fm = std('#b8892f', { metalness:.5, roughness:.4 });
+    for(const [x, y, w, h] of [[-.6,1.08,.1,2.2],[.6,1.08,.1,2.2],[0,2.2,1.3,.1]]){ const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, .08), fm); b.position.set(x, y, 0); g.add(b); }
+    const lab = textSprite('To ' + to.name, { size:36 }); lab.position.set(0, 2.5, .1); g.add(lab);
+    open.userData.door = dr; glow.userData.door = dr; doorHits.push(open, glow);
+  }
+}
+
+async function ensureSpark(){
+  if(spark) return true;
+  try{ const m = await import('@sparkjsdev/spark'); spark = { mod:m, r:new m.SparkRenderer({ renderer }) }; scene.add(spark.r); return true; }
+  catch(e){ console.warn('splat renderer failed to load', e); return false; }
+}
+function applySplatXf(room){
+  if(!splatRoot) return; const s = room.splat;
+  splatRoot.rotation.set(s.flip ? Math.PI : 0, (s.turn || 0) * Math.PI / 2, 0);
+  splatRoot.scale.setScalar(s.scale || 1); splatRoot.position.set(0, s.y || 0, 0); splatRoot.updateMatrixWorld(true);
+}
+
+async function buildRoom(room){
+  const token = ++buildToken;
+  disposeGroup(roomGroup); disposeGroup(fxGroup);
+  if(splatRoot){ scene.remove(splatRoot); splatRoot.traverse(o => o.dispose && o.dispose()); splatRoot = null; }
+  pickables = []; colliders = []; doorHits = []; colliderMeshes = null; cur = room;
+  const { w, d, h } = room, T = THEMES[room.theme] || THEMES.gallery, isSplat = !!room.splat;
+  roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55));
+  const hide = isSplat ? { transparent:true, opacity:0, depthWrite:false } : {};
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std('#ffffff', { map:isSplat ? null : floorTex(T.floor, T.fc, w, d), ...hide }));
+  floor.rotation.x = -Math.PI / 2; roomGroup.add(floor); pickables.push(floor);
+  const wm = std(T.wall, { ...hide, side:THREE.FrontSide });
+  for(const k of ['N','S','E','W']){
+    const len = (k === 'N' || k === 'S') ? w : d;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(len, h), wm); const p = doorPos(room, k), n = wallNormal(k);
+    m.position.set(p.x, h / 2, p.z); m.lookAt(p.x + n.x, h / 2, p.z + n.z); roomGroup.add(m); pickables.push(m);
+    if(!isSplat){ const b = new THREE.Mesh(new THREE.BoxGeometry(len, .12, .04), std(shade(T.wall, .6))); b.position.set(p.x + n.x * .02, .06, p.z + n.z * .02); b.lookAt(p.x + n.x, .06, p.z + n.z); roomGroup.add(b); }
+  }
+  if(!isSplat){
+    const c = new THREE.Mesh(new THREE.PlaneGeometry(w, d), std(T.ceil)); c.rotation.x = Math.PI / 2; c.position.y = h; roomGroup.add(c);
+    furnish(room);
+  }
+  buildDoors(room);
+  rebuildObjects(); rebuildRoute(); renderRooms(); drawMap();
+  if(isSplat){
+    splatRoot = new THREE.Group(); scene.add(splatRoot); applySplatXf(room);
+    const buf = await fileGet(room.splat.fileId);
+    if(token !== buildToken) return;
+    if(!buf){ toast('The room file is not stored on this device. Add the room again from its file.', 5000); return; }
+    if(await ensureSpark()){
+      if(token !== buildToken) return;
+      try{ const sm = new spark.mod.SplatMesh({ fileBytes:new Uint8Array(buf.slice(0)), fileName:room.splat.name }); splatRoot.add(sm); }
+      catch(e){ console.warn(e); toast('That room file could not be shown.', 4000); }
+    } else toast('The splat viewer could not load, so this room shows as empty space.', 5000);
+    if(room.splat.colId){
+      const cb = await fileGet(room.splat.colId);
+      if(cb && token === buildToken){
+        try{ const gl = await new GLTFLoader().parseAsync(cb.slice(0), ''); const inv = new THREE.MeshBasicMaterial({ colorWrite:false, depthWrite:false });
+          colliderMeshes = []; gl.scene.traverse(o => { if(o.isMesh){ o.material = inv; colliderMeshes.push(o); } }); splatRoot.add(gl.scene); splatRoot.updateMatrixWorld(true);
+        }catch(e){ console.warn(e); }
+      }
+    }
+  }
+}
+
+/* ---------- objects ---------- */
+const objNodes = new Map();     // id -> THREE.Group
+const gltfCache = new Map();
+const SHAPES = [
+  () => new THREE.IcosahedronGeometry(.28, 0), () => new THREE.TorusKnotGeometry(.18, .07, 80, 12), () => new THREE.ConeGeometry(.25, .55, 5),
+  () => new THREE.TorusGeometry(.22, .09, 12, 28), () => new THREE.OctahedronGeometry(.3), () => new THREE.CylinderGeometry(.16, .26, .5, 7),
+  () => new THREE.DodecahedronGeometry(.27), () => new THREE.SphereGeometry(.27, 20, 14)
+];
+function placeholderModel(desc){
+  const h = hash(desc), g = new THREE.Group();
+  const col = new THREE.Color().setHSL((h % 360) / 360, .62, .56);
+  const m = new THREE.Mesh(SHAPES[h % SHAPES.length](), new THREE.MeshStandardMaterial({ color:col, roughness:.35, metalness:.25, flatShading:true }));
+  m.geometry.computeBoundingBox(); m.position.y = -m.geometry.boundingBox.min.y; g.add(m);
+  const lab = textSprite(desc.replace(/^Example:\s*/i, ''), { size:30, fixed:true }); lab.position.y = .78; g.add(lab); g.userData.labelY = .78;
+  return g;
+}
+async function glbModel(o){
+  let src = gltfCache.get(o.fileId);
+  if(!src){
+    const buf = await fileGet(o.fileId); if(!buf) return null;
+    let gl;
+    if(buf.main){   // a .gltf with separate texture and data files, as the online library serves them
+      const urls = {}, made = []; for(const [k, b] of Object.entries(buf.files)){ const u = URL.createObjectURL(new Blob([b])); urls[k] = u; made.push(u); }
+      const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => { const key = decodeURIComponent(u).replace(/^(\.\/)+/, ''); return urls[key] || urls[key.split('/').pop()] || u; });
+      gl = await new GLTFLoader(mgr).parseAsync(buf.main.slice(0), ''); setTimeout(() => made.forEach(u => URL.revokeObjectURL(u)), 20000);
+    } else gl = await new GLTFLoader().parseAsync(buf.slice(0), '');
+    const box = new THREE.Box3().setFromObject(gl.scene), sz = box.getSize(new THREE.Vector3()), big = Math.max(sz.x, sz.y, sz.z, 1e-4);
+    const k = (o.real && big > .08 && big < 2.6) ? 1 : .6 / big;
+    const wrap = new THREE.Group(); gl.scene.position.set(-(box.min.x + sz.x / 2) * k, -box.min.y * k, -(box.min.z + sz.z / 2) * k); gl.scene.scale.setScalar(k); wrap.add(gl.scene);
+    wrap.userData.h = sz.y * k; src = wrap; gltfCache.set(o.fileId, src);
+  }
+  const g = src.clone(true); g.userData.labelY = src.userData.h + .12; return g;
+}
+function blobShadow(){
+  const t = canvasTex(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 2, 32, 32, 30); r.addColorStop(0, 'rgba(0,0,0,.55)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(.9, .9), new THREE.MeshBasicMaterial({ map:t, transparent:true, depthWrite:false })); m.rotation.x = -Math.PI / 2; m.position.y = .012; return m;
+}
+function applyObjXf(o){ const n = objNodes.get(o.id); if(!n) return; n.position.fromArray(o.pos); n.rotation.y = o.rotY; n.userData.model.scale.setScalar(o.scale); const y = (n.userData.model.userData.labelY || .7) * o.scale + .2; n.userData.num.position.y = y; }
+async function makeObjNode(o){
+  const n = new THREE.Group(); n.userData.id = o.id;
+  let model = null;
+  if(o.fileId){ try{ model = await glbModel(o); }catch(e){ console.warn(e); } }
+  if(!model) model = placeholderModel(o.desc);
+  model.traverse(c => { c.userData.objId = o.id; });
+  n.add(model); n.userData.model = model;
+  const num = numberSprite(locusNo(o.id) || '?'); n.add(num); n.userData.num = num;
+  if(!o.wallN) n.add(blobShadow());
+  return n;
+}
+let objToken = 0;
+async function rebuildObjects(){
+  const token = ++objToken; disposeGroup(objGroup); objNodes.clear();
+  for(const o of P.objects.filter(o => o.room === cur.id)){
+    const n = await makeObjNode(o); if(token !== objToken) return;
+    objNodes.set(o.id, n); objGroup.add(n); applyObjXf(o);
+  }
+  showGuide();
+}
+function refreshNumbers(){ for(const [id, n] of objNodes){ const old = n.userData.num; const s = numberSprite(locusNo(id)); s.position.copy(old.position); n.remove(old); old.material.map.dispose(); old.material.dispose(); n.add(s); n.userData.num = s; } }
+
+/* ---------- route line ---------- */
+function rebuildRoute(){
+  disposeGroup(fxGroup);
+  const mat = new THREE.MeshBasicMaterial({ color:'#5fd0c5', transparent:true, opacity:.85 });
+  const pts = [];
+  const flat = o => new THREE.Vector3(o.pos[0], .04, o.pos[2]);
+  for(let i = 0; i < P.route.length; i++){
+    const a = objById(P.route[i]), b = objById(P.route[i + 1]); if(!a) continue;
+    if(a.room === cur.id && b && b.room === cur.id) pts.push([flat(a), flat(b)]);
+    else if(b && a.room === cur.id && b.room !== cur.id){ const dr = cur.doors.find(d => d.to === b.room); if(dr) pts.push([flat(a), doorPos(cur, dr.wall).setY(.04)]); }
+    else if(b && a.room !== cur.id && b.room === cur.id){ const dr = cur.doors.find(d => d.to === a.room); if(dr) pts.push([doorPos(cur, dr.wall).setY(.04), flat(b)]); }
+  }
+  for(const [a, b] of pts){
+    const len = a.distanceTo(b); if(len < .05) continue;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(.06, .012, len), mat); m.position.copy(a).lerp(b, .5); m.lookAt(b); fxGroup.add(m);
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(.11, .26, 3), mat); tip.position.copy(a).lerp(b, .5); tip.lookAt(b); tip.rotateX(Math.PI / 2); tip.scale.y = 1; tip.position.y = .05; tip.scale.set(1, 1, .25); fxGroup.add(tip);
+  }
+  showGuide();
+}
+
+/* ---------- camera, walking, gliding ---------- */
+const pos = new THREE.Vector3(0, EYE, 2); let yaw = 0, pitch = 0, glide = null;
+const keys = new Set(); const joy = { on:false, id:null, x:0, y:0, ox:0, oy:0 };
+function clampToRoom(p){
+  if(colliderMeshes) return;
+  const m = .32; p.x = Math.max(-cur.w / 2 + m, Math.min(cur.w / 2 - m, p.x)); p.z = Math.max(-cur.d / 2 + m, Math.min(cur.d / 2 - m, p.z));
+  for(const c of colliders){
+    const x0 = c.min[0] - m, x1 = c.max[0] + m, z0 = c.min[1] - m, z1 = c.max[1] + m;
+    if(p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1){ const dx = Math.min(p.x - x0, x1 - p.x), dz = Math.min(p.z - z0, z1 - p.z); if(dx < dz) p.x = (p.x - x0 < x1 - p.x) ? x0 : x1; else p.z = (p.z - z0 < z1 - p.z) ? z0 : z1; }
+  }
+}
+function nearDoor(p){
+  for(const dr of cur.doors){ const dp = doorPos(cur, dr.wall); if(Math.hypot(p.x - dp.x, p.z - dp.z) < .62) return dr; }
+  return null;
+}
+const ray = new THREE.Raycaster();
+function startGlide(to, toYaw, toPitch = 0, dur){
+  const d = pos.distanceTo(to); dur = dur ?? Math.min(1.4, .35 + d * .14);
+  let dy = toYaw == null ? 0 : ((toYaw - yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+  glide = { a:pos.clone(), b:to.clone(), y0:yaw, dy, p0:pitch, p1:toYaw == null ? pitch : toPitch, t:0, dur:matchMedia('(prefers-reduced-motion:reduce)').matches ? .01 : dur };
+  return new Promise(res => glide.done = res);
+}
+function faceFrom(from, target){ const dx = target.x - from.x, dz = target.z - from.z; return { yaw:Math.atan2(-dx, -dz), pitch:Math.atan2(target.y - from.y, Math.hypot(dx, dz)) }; }
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if(glide){
+    glide.t += dt / glide.dur; const k = glide.t >= 1 ? 1 : 1 - Math.pow(1 - glide.t, 3);
+    pos.lerpVectors(glide.a, glide.b, k); yaw = glide.y0 + glide.dy * k; pitch = glide.p0 + (glide.p1 - glide.p0) * k;
+    if(glide.t >= 1){ const f = glide.done; glide = null; f && f(); }
+  } else {
+    let f = 0, s = 0, turn = 0;
+    if(keys.has('w') || keys.has('arrowup')) f += 1; if(keys.has('s') || keys.has('arrowdown')) f -= 1;
+    if(keys.has('d')) s += 1; if(keys.has('a')) s -= 1;
+    if(keys.has('arrowleft') || keys.has('q')) turn += 1; if(keys.has('arrowright') || keys.has('e')) turn -= 1;
+    if(joy.on){ f += -joy.y; s += joy.x; }
+    yaw += turn * 1.9 * dt;
+    if(f || s){
+      const sp = (keys.has('shift') ? 4.2 : 2.3) * dt, sn = Math.sin(yaw), cs = Math.cos(yaw);
+      const nx = pos.x + (-sn * f + cs * s) * sp, nz = pos.z + (-cs * f - sn * s) * sp;
+      let blocked = false;
+      if(colliderMeshes){
+        const dir = new THREE.Vector3(nx - pos.x, 0, nz - pos.z).normalize(); ray.set(new THREE.Vector3(pos.x, pos.y - .9, pos.z), dir); ray.far = .45;
+        blocked = ray.intersectObjects(colliderMeshes, false).length > 0; ray.far = Infinity;
+      }
+      if(!blocked){ pos.x = nx; pos.z = nz; }
+      const dr = !tour.on && nearDoor(pos); if(dr && f > 0){ goDoor(dr); }
+      clampToRoom(pos);
+      if(colliderMeshes){ ray.set(new THREE.Vector3(pos.x, pos.y + .2, pos.z), new THREE.Vector3(0, -1, 0)); const h = ray.intersectObjects(colliderMeshes, false)[0]; if(h) pos.y += (h.point.y + EYE - pos.y) * Math.min(1, dt * 10); }
+      if(mapOpen()) drawMap();
+    }
+  }
+  camera.position.copy(pos); camera.rotation.set(pitch, yaw, 0);
+  const t = now / 1000; for(const m of fxGroup.children) if(m.material) m.material.opacity = .6 + .3 * Math.sin(t * 2.4);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+/* ---------- room switching ---------- */
+let switching = false;
+async function enterRoom(room, at){
+  if(switching) return; switching = true; closeCard();
+  $('fade').style.opacity = 1; await new Promise(r => setTimeout(r, 230));
+  await buildRoom(room);
+  if(at){ pos.copy(at.pos); yaw = at.yaw; pitch = at.pitch || 0; } else { pos.set(0, EYE, Math.min(room.d / 2 - 1, 2.4)); yaw = 0; pitch = 0; clampToRoom(pos); }
+  $('fade').style.opacity = 0; switching = false; save.cur = room.id;
+}
+function goDoor(dr){
+  const to = roomById(dr.to); if(!to || switching) return;
+  const back = to.doors.find(d => d.to === cur.id);
+  let at = null;
+  if(back){ const p = doorPos(to, back.wall), n = wallNormal(back.wall); const pp = p.clone().addScaledVector(n, 1.0).setY(EYE); at = { pos:pp, yaw:Math.atan2(-n.x, -n.z) }; }
+  enterRoom(to, at);
+}
+
+/* ---------- picking ---------- */
+function pick(x, y, list, rec = false){
+  const r = canvas.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
+  return ray.intersectObjects(list, rec)[0] || null;
+}
+function surfaceHit(x, y){
+  const list = colliderMeshes ? colliderMeshes.concat(pickables) : pickables; const h = pick(x, y, list);
+  if(!h) return null; const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new THREE.Vector3(0, 1, 0); return { point:h.point, normal:n };
+}
+
+/* ---------- selection, card, editing ---------- */
+let sel = null, placing = false, snapOn = true, editing = false, quiz = false, revealed = false;
+const guide = new THREE.Group(); scene.add(guide);
+(function(){ const m = new THREE.MeshBasicMaterial({ color:'#efe4cf', transparent:true, opacity:.22, depthWrite:false });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(.2, 1.05, 4, 10), m); body.position.y = .72; const head = new THREE.Mesh(new THREE.SphereGeometry(.13, 12, 10), m); head.position.y = 1.57;
+  const lab = textSprite('1.7 m person, for scale', { size:26, fixed:true }); lab.position.y = 1.95; guide.add(body, head, lab); guide.visible = false; })();
+function showGuide(){
+  const o = sel && objById(sel); if(!o || !editing || o.room !== cur.id){ guide.visible = false; return; }
+  guide.visible = true; const right = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+  guide.position.set(o.pos[0], 0, o.pos[2]).addScaledVector(right, .75 + .4 * o.scale); const p = guide.position.clone(); clampToRoom(p); guide.position.x = p.x; guide.position.z = p.z;
+}
+function renderCard(){
+  const o = sel && objById(sel); const c = $('card'); if(!o){ c.classList.remove('show'); guide.visible = false; return; }
+  c.classList.add('show'); $('cardNum').textContent = locusNo(o.id); $('cardDesc').textContent = o.desc;
+  const r = roomById(o.room); $('cardRoom').textContent = r ? r.name : '';
+  const hideNote = quiz && !revealed && !editing;
+  $('noteView').style.display = editing || hideNote ? 'none' : 'block'; $('noteView').textContent = o.note || 'No note yet. Choose Edit to say what this stands for.';
+  $('reveal').style.display = hideNote ? 'block' : 'none';
+  $('editBox').style.display = editing ? 'flex' : 'none'; $('cardEdit').textContent = editing ? 'Done' : 'Edit';
+  if(editing && document.activeElement !== $('noteEdit')) $('noteEdit').value = o.note || '';
+  $('eSnap').classList.toggle('on', snapOn); $('eMove').textContent = placing ? 'Click a spot to set it down' : 'Move';
+  showGuide();
+}
+function select(id, { edit = false } = {}){ sel = id; editing = edit; revealed = false; if(!edit) placing = false; renderCard(); renderCount(); }
+function closeCard(){ sel = null; placing = false; editing = false; renderCard(); }
+function placeAt(o, hit){
+  if(snapOn){
+    if(hit.normal.y > .6){ o.pos = [hit.point.x, hit.point.y, hit.point.z]; o.wallN = null; }
+    else { const r = .3 * o.scale; const p = hit.point.clone().addScaledVector(hit.normal, r); o.pos = [p.x, Math.max(0, hit.point.y - .3 * o.scale), p.z]; o.wallN = [hit.normal.x, hit.normal.z]; }
+  } else {
+    const pl = new THREE.Plane(new THREE.Vector3(0, 1, 0), -o.pos[1]); const v = new THREE.Vector3(); if(ray.ray.intersectPlane(pl, v)){ const p = v.clone(); p.y = 0; clampToRoom(p); o.pos = [p.x, o.pos[1], p.z]; }
+  }
+  applyObjXf(o); showGuide();
+}
+function nudge(fn){ const o = sel && objById(sel); if(!o) return; fn(o); applyObjXf(o); rebuildRoute(); save(); if(mapOpen()) drawMap(); }
+
+/* ---------- loci navigation ---------- */
+let curLocus = -1; const tour = { on:false, t:0 };
+function renderCount(){
+  const n = P.route.length; const i = sel ? P.route.indexOf(sel) : curLocus; if(i >= 0) curLocus = i;
+  $('count').innerHTML = `<b>${curLocus >= 0 ? curLocus + 1 : '–'}</b> of ${n}`;
+  $('bPrev').disabled = $('bNext').disabled = $('bTour').disabled = n === 0;
+}
+async function goLocus(i){
+  if(!P.route.length) return; i = (i + P.route.length) % P.route.length; const o = objById(P.route[i]); if(!o) return;
+  curLocus = i;
+  if(o.room !== cur.id){ await enterRoom(roomById(o.room)); }
+  const target = new THREE.Vector3(o.pos[0], o.pos[1] + .35 * o.scale, o.pos[2]);
+  let dir = o.wallN ? new THREE.Vector3(o.wallN[0], 0, o.wallN[1]) : new THREE.Vector3(pos.x - o.pos[0], 0, pos.z - o.pos[2]);
+  if(dir.lengthSq() < .01) dir.set(-o.pos[0], 0, -o.pos[2]); if(dir.lengthSq() < .01) dir.set(0, 0, 1); dir.normalize();
+  const vp = new THREE.Vector3(o.pos[0], EYE, o.pos[2]).addScaledVector(dir, 1.9); if(!colliderMeshes) clampToRoom(vp);
+  if(Math.hypot(vp.x - o.pos[0], vp.z - o.pos[2]) < .9){ vp.set(o.pos[0], EYE, o.pos[2]).addScaledVector(dir, -1.9); clampToRoom(vp); }
+  const f = faceFrom(vp, target); select(o.id); await startGlide(vp, f.yaw, f.pitch); if(mapOpen()) drawMap();
+}
+async function runTour(){
+  tour.on = true; $('bTour').textContent = 'Stop tour'; $('bTour').classList.add('on'); let i = 0;
+  while(tour.on && i < P.route.length){ await goLocus(i); const wait = +$('pace').value * 1000; const t0 = performance.now(); while(tour.on && performance.now() - t0 < wait) await new Promise(r => setTimeout(r, 100)); i++; }
+  if(tour.on) toast('End of the route.'); stopTour();
+}
+function stopTour(){ tour.on = false; $('bTour').textContent = 'Tour'; $('bTour').classList.remove('on'); }
+
+/* ---------- input ---------- */
+const ptr = new Map(); let lookId = null;
+canvas.addEventListener('pointerdown', e => {
+  canvas.focus(); canvas.setPointerCapture(e.pointerId); ptr.set(e.pointerId, { x:e.clientX, y:e.clientY, sx:e.clientX, sy:e.clientY, t:performance.now(), moved:0 });
+  if(e.pointerType === 'touch' && e.clientX < innerWidth * .4 && e.clientY > innerHeight * .45 && !joy.on && !placing){
+    joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0; const s = $('stick'); s.style.display = 'block'; s.style.left = (e.clientX - 48) + 'px'; s.style.top = (e.clientY - 48) + 'px';
+  } else if(lookId == null) lookId = e.pointerId;
+});
+canvas.addEventListener('pointermove', e => {
+  const p = ptr.get(e.pointerId);
+  if(!p){ if(placing && e.pointerType === 'mouse') movePlacing(e.clientX, e.clientY); return; }
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; p.moved += Math.abs(dx) + Math.abs(dy);
+  if(joy.on && joy.id === e.pointerId){ joy.x = Math.max(-1, Math.min(1, (e.clientX - joy.ox) / 42)); joy.y = Math.max(-1, Math.min(1, (e.clientY - joy.oy) / 42)); $('stick').firstElementChild.style.transform = `translate(${joy.x * 28}px,${joy.y * 28}px)`; return; }
+  if(lookId === e.pointerId && p.moved > 5 && !glide){ const k = e.pointerType === 'touch' ? .0052 : .0042; yaw += dx * k; pitch = Math.max(-1.25, Math.min(1.25, pitch + dy * k)); if(tour.on) stopTour(); }
+});
+function endPtr(e){
+  const p = ptr.get(e.pointerId); if(!p) return; ptr.delete(e.pointerId);
+  if(joy.id === e.pointerId){ joy.on = false; joy.id = null; $('stick').style.display = 'none'; $('stick').firstElementChild.style.transform = ''; return; }
+  if(lookId === e.pointerId) lookId = null;
+  if(e.type === 'pointerup' && p.moved < 7 && performance.now() - p.t < 450) click(e.clientX, e.clientY);
+}
+canvas.addEventListener('pointerup', endPtr); canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('wheel', e => { e.preventDefault(); if(glide) return; const sp = -Math.sign(e.deltaY) * .35; pos.x += -Math.sin(yaw) * sp; pos.z += -Math.cos(yaw) * sp; clampToRoom(pos); }, { passive:false });
+window.addEventListener('keydown', e => {
+  if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase(); keys.add(k);
+  if(k === 'escape'){ if(placing){ placing = false; renderCard(); } else closeCard(); }
+  if(k === 'n' || k === ']') goLocus(curLocus + 1); if(k === 'p' || k === '[') goLocus(curLocus - 1);
+  if(k === 'm') togglePanel('mapPanel'); if(k === '/'){ e.preventDefault(); togglePanel('findPanel', true); }
+  if(k.startsWith('arrow') || k === ' ') e.preventDefault();
+});
+window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur', () => keys.clear());
+
+function movePlacing(x, y){ const o = objById(sel); if(!o) return; const h = surfaceHit(x, y); if(h) placeAt(o, h); }
+function click(x, y){
+  if(switching) return; if(tour.on) stopTour();
+  if(placing && sel){ movePlacing(x, y); placing = false; rebuildRoute(); save(); renderCard(); if(mapOpen()) drawMap(); return; }
+  const oh = pick(x, y, objGroup.children, true), dh = pick(x, y, doorHits), sh = surfaceHit(x, y);
+  const od = oh ? oh.distance : Infinity, dd = dh ? dh.distance : Infinity, sd = sh ? sh.point.distanceTo(camera.position) : Infinity;
+  if(oh && od <= dd && od <= sd + .05){ let n = oh.object; while(n && !n.userData.id) n = n.parent; if(n){ if(editing && sel === n.userData.id) return; goLocus(P.route.indexOf(n.userData.id)); } return; }
+  if(dh && dd <= sd + .2){ goDoor(dh.object.userData.door); return; }
+  if(sh){
+    if(sel && !editing) closeCard();
+    if(sh.normal.y > .6 && sh.point.y < .3 || (colliderMeshes && sh.normal.y > .6)){ const to = new THREE.Vector3(sh.point.x, colliderMeshes ? sh.point.y + EYE : EYE, sh.point.z); clampToRoom(to); startGlide(to, null).then(() => { if(mapOpen()) drawMap(); }); }
+    else { const to = sh.point.clone().addScaledVector(new THREE.Vector3(sh.normal.x, 0, sh.normal.z).normalize(), 1.2); to.y = pos.y; clampToRoom(to); const f = faceFrom(to, sh.point); startGlide(to, f.yaw, f.pitch * .6); }
+  }
+}
+
+/* ---------- top bar, panels ---------- */
+function renderRooms(){
+  const el = $('rooms'); el.innerHTML = '';
+  for(const r of P.rooms){ const b = document.createElement('button'); b.textContent = r.name; b.setAttribute('role', 'tab'); if(cur && r.id === cur.id){ b.classList.add('on'); b.setAttribute('aria-selected', 'true'); } b.onclick = () => { if(r.id !== cur.id) enterRoom(r); }; el.appendChild(b); }
+  if(P.rooms.length < MAX_ROOMS){ const b = document.createElement('button'); b.textContent = '+ Room'; b.onclick = openRoomModal; el.appendChild(b); }
+  $('palaceName').textContent = P.name; $('roomCount').textContent = `${P.rooms.length} of ${MAX_ROOMS} rooms`;
+}
+const PANELS = ['mapPanel','findPanel','viewsPanel','roomPanel'];
+const mapOpen = () => $('mapPanel').classList.contains('show');
+function togglePanel(id, forceOpen){
+  const open = forceOpen || !$(id).classList.contains('show'); PANELS.forEach(p => $(p).classList.remove('show'));
+  if(open){ $(id).classList.add('show'); if(id === 'mapPanel') drawMap(); if(id === 'findPanel'){ $('findInput').focus(); renderFind(); } if(id === 'viewsPanel') renderViews(); if(id === 'roomPanel') renderRoomPanel(); }
+}
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => $(b.dataset.close).classList.remove('show'));
+$('bMap').onclick = () => togglePanel('mapPanel'); $('bFind').onclick = () => togglePanel('findPanel'); $('bViews').onclick = () => togglePanel('viewsPanel'); $('bRoom').onclick = () => togglePanel('roomPanel');
+
+/* map */
+function mapLayout(){
+  const cell = new Map(), used = new Set(); const key = (x, y) => x + ',' + y; const D = { N:[0,-1], S:[0,1], E:[1,0], W:[-1,0] };
+  const q = []; const put = (r, x, y) => { cell.set(r.id, [x, y]); used.add(key(x, y)); q.push(r); };
+  for(const r0 of P.rooms){
+    if(cell.has(r0.id)) continue; let x = 0, y = 0; while(used.has(key(x, y))){ x++; if(x > 3){ x = 0; y++; } } put(r0, x, y);
+    while(q.length){ const r = q.shift(), [cx, cy] = cell.get(r.id); for(const d of r.doors){ const t = roomById(d.to); if(!t || cell.has(t.id)) continue; let nx = cx + D[d.wall][0], ny = cy + D[d.wall][1]; while(used.has(key(nx, ny))){ nx += D[d.wall][0] || 1; ny += D[d.wall][1]; } put(t, nx, ny); } }
+  }
+  return cell;
+}
+let mapHits = [];
+function drawMap(){
+  if(!mapOpen()) return; const c = $('mapCanvas'), g = c.getContext('2d'), W = c.width, H = c.height; g.clearRect(0, 0, W, H); mapHits = [];
+  const cell = mapLayout(); let x0 = 9, x1 = -9, y0 = 9, y1 = -9; for(const [x, y] of cell.values()){ x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const cols = x1 - x0 + 1, rows = y1 - y0 + 1, cs = Math.min((W - 40) / cols, (H - 40) / rows), ox = (W - cs * cols) / 2, oy = (H - cs * rows) / 2;
+  const maxDim = Math.max(...P.rooms.map(r => Math.max(r.w, r.d))), k = (cs - 34) / maxDim; const rect = {};
+  for(const r of P.rooms){ const [cx, cy] = cell.get(r.id); const mx = ox + (cx - x0 + .5) * cs, my = oy + (cy - y0 + .5) * cs; rect[r.id] = { mx, my, w:r.w * k, h:r.d * k }; }
+  g.strokeStyle = 'rgba(217,164,65,.7)'; g.lineWidth = 3; g.setLineDash([6, 5]);
+  for(const r of P.rooms) for(const d of r.doors){ const a = rect[r.id], b = rect[d.to]; if(!b) continue; const p = doorPos(r, d.wall); g.beginPath(); g.moveTo(a.mx + p.x * k, a.my + p.z * k); g.lineTo(b.mx, b.my); g.stroke(); }
+  g.setLineDash([]);
+  for(const r of P.rooms){ const a = rect[r.id], on = r.id === cur.id; g.fillStyle = on ? 'rgba(217,164,65,.2)' : 'rgba(239,228,207,.08)'; g.strokeStyle = on ? '#d9a441' : 'rgba(239,228,207,.45)'; g.lineWidth = on ? 3 : 2;
+    g.beginPath(); g.roundRect(a.mx - a.w / 2, a.my - a.h / 2, a.w, a.h, 6); g.fill(); g.stroke(); g.fillStyle = '#efe4cf'; g.font = '600 20px Figtree, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'bottom'; g.fillText(r.name, a.mx, a.my - a.h / 2 - 5);
+    mapHits.push({ type:'room', id:r.id, x:a.mx - a.w / 2, y:a.my - a.h / 2, w:a.w, h:a.h }); }
+  g.strokeStyle = 'rgba(95,208,197,.8)'; g.lineWidth = 2; g.beginPath(); let started = false;
+  const lp = o => { const a = rect[o.room]; return a ? [a.mx + o.pos[0] * k, a.my + o.pos[2] * k] : null; };
+  for(const id of P.route){ const o = objById(id); const p = o && lp(o); if(!p) continue; if(!started){ g.moveTo(p[0], p[1]); started = true; } else g.lineTo(p[0], p[1]); } g.stroke();
+  P.route.forEach((id, i) => { const o = objById(id); const p = o && lp(o); if(!p) return; g.fillStyle = id === sel ? '#fff' : '#d9a441'; g.beginPath(); g.arc(p[0], p[1], 12, 0, 7); g.fill(); g.fillStyle = '#1c1408'; g.font = '700 14px Figtree, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(i + 1, p[0], p[1] + 1); mapHits.push({ type:'locus', i, x:p[0] - 14, y:p[1] - 14, w:28, h:28 }); });
+  const a = rect[cur.id]; if(a){ const px = a.mx + pos.x * k, py = a.my + pos.z * k; g.save(); g.translate(px, py); g.rotate(-yaw); g.fillStyle = '#5fd0c5'; g.beginPath(); g.moveTo(0, -13); g.lineTo(8, 9); g.lineTo(0, 5); g.lineTo(-8, 9); g.closePath(); g.fill(); g.restore(); }
+}
+$('mapCanvas').addEventListener('click', e => {
+  const r = e.target.getBoundingClientRect(), x = (e.clientX - r.left) * (e.target.width / r.width), y = (e.clientY - r.top) * (e.target.height / r.height);
+  const hit = [...mapHits].reverse().find(h => x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h); if(!hit) return;
+  if(hit.type === 'locus') goLocus(hit.i); else { const room = roomById(hit.id); if(room.id !== cur.id) enterRoom(room).then(drawMap); }
+});
+
+/* find */
+function renderFind(){
+  const q = $('findInput').value.trim().toLowerCase(), el = $('findList'); el.innerHTML = ''; const out = [];
+  const m = q.match(/^(?:item|spot|#)?\s*(\d+)$/); if(m && P.route[+m[1] - 1]) out.push({ t:'l', i:+m[1] - 1 });
+  P.route.forEach((id, i) => { const o = objById(id); if(o && (!q || (o.desc + ' ' + (quiz ? '' : o.note)).toLowerCase().includes(q)) && !out.some(x => x.t === 'l' && x.i === i)) out.push({ t:'l', i }); });
+  P.rooms.forEach(r => { if(q && r.name.toLowerCase().includes(q)) out.push({ t:'r', r }); });
+  P.bookmarks.forEach(b => { if(q && b.name.toLowerCase().includes(q)) out.push({ t:'b', b }); });
+  for(const x of out.slice(0, 30)){ const b = document.createElement('button');
+    if(x.t === 'l'){ const o = objById(P.route[x.i]); b.innerHTML = `<span class="num">${x.i + 1}</span><span></span>`; b.lastChild.textContent = o.desc; b.onclick = () => goLocus(x.i); }
+    else if(x.t === 'r'){ b.textContent = 'Room: ' + x.r.name; b.onclick = () => x.r.id !== cur.id && enterRoom(x.r); }
+    else { b.textContent = 'View: ' + x.b.name; b.onclick = () => goView(x.b); }
+    el.appendChild(b); }
+  if(!out.length) el.innerHTML = '<div class="muted small">Nothing matches.</div>';
+}
+$('findInput').addEventListener('input', renderFind);
+$('findInput').addEventListener('keydown', e => { if(e.key === 'Enter'){ const b = $('findList').querySelector('button'); if(b) b.click(); } });
+
+/* saved views */
+async function goView(b){ const room = roomById(b.room); if(!room) return; if(room.id !== cur.id) await enterRoom(room, { pos:new THREE.Vector3().fromArray(b.pos), yaw:b.yaw, pitch:b.pitch }); else startGlide(new THREE.Vector3().fromArray(b.pos), b.yaw, b.pitch); }
+function renderViews(){
+  const el = $('viewList'); el.innerHTML = '';
+  P.bookmarks.forEach((b, i) => { const row = document.createElement('div'); row.className = 'row'; const go = document.createElement('button'); go.className = 'grow'; go.style.flex = '1'; go.style.textAlign = 'left'; go.textContent = `${b.name} · ${roomById(b.room)?.name || ''}`; go.onclick = () => goView(b); const del = document.createElement('button'); del.textContent = '✕'; del.setAttribute('aria-label', 'Delete view'); del.onclick = () => { P.bookmarks.splice(i, 1); save(); renderViews(); }; row.append(go, del); el.appendChild(row); });
+  if(!P.bookmarks.length) el.innerHTML = '<div class="muted small">Stand somewhere worth returning to, name it, and save.</div>';
+}
+$('viewSave').onclick = () => { const name = $('viewName').value.trim() || `View ${P.bookmarks.length + 1}`; P.bookmarks.push({ name, room:cur.id, pos:pos.toArray(), yaw, pitch }); $('viewName').value = ''; save(); renderViews(); toast('View saved.'); };
+
+/* room panel */
+function renderRoomPanel(){
+  $('rName').value = cur.name; $('pName').value = P.name; const s = cur.splat; $('rSplat').style.display = s ? 'flex' : 'none';
+  if(s){ $('rScale').value = s.scale || 1; $('rScaleV').textContent = (s.scale || 1).toFixed(2) + '×'; $('rY').value = s.y || 0; $('rYV').textContent = (s.y || 0).toFixed(2) + ' m'; }
+  $('rDelete').disabled = P.rooms.length < 2; $('rAdd').disabled = P.rooms.length >= MAX_ROOMS; resetArm();
+}
+$('rName').addEventListener('input', e => { cur.name = e.target.value || 'Room'; save(); renderRooms(); });
+$('pName').addEventListener('input', e => { P.name = e.target.value || 'My palace'; save(); renderRooms(); });
+$('rFlip').onclick = () => { cur.splat.flip = !cur.splat.flip; applySplatXf(cur); save(); };
+$('rTurn').onclick = () => { cur.splat.turn = ((cur.splat.turn || 0) + 1) % 4; applySplatXf(cur); save(); };
+$('rScale').oninput = e => { cur.splat.scale = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
+$('rY').oninput = e => { cur.splat.y = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
+$('rAdd').onclick = openRoomModal;
+let armed = null; function resetArm(){ armed = null; $('rDelete').textContent = 'Delete room'; $('pReset').textContent = 'Start over with the example'; }
+$('rDelete').onclick = () => {
+  if(armed !== 'room'){ resetArm(); armed = 'room'; $('rDelete').textContent = 'Click again to delete this room and its objects'; return; }
+  const id = cur.id; P.objects = P.objects.filter(o => o.room !== id); P.route = P.route.filter(i => objById(i)); P.bookmarks = P.bookmarks.filter(b => b.room !== id);
+  P.rooms = P.rooms.filter(r => r.id !== id); P.rooms.forEach(r => r.doors = r.doors.filter(d => d.to !== id)); save(); $('roomPanel').classList.remove('show'); curLocus = -1; renderCount(); enterRoom(P.rooms[0]);
+};
+$('pReset').onclick = () => { if(armed !== 'reset'){ resetArm(); armed = 'reset'; $('pReset').textContent = 'Click again to erase this palace'; return; } P = examplePalace(); lsSet(P); curLocus = -1; closeCard(); renderCount(); $('roomPanel').classList.remove('show'); enterRoom(P.rooms[0]); };
+
+/* ---------- modals ---------- */
+function openModal(id){ $('modalWrap').classList.add('show'); document.querySelectorAll('.modal').forEach(m => m.classList.toggle('show', m.id === id)); }
+function closeModal(){ $('modalWrap').classList.remove('show'); }
+document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = closeModal);
+$('modalWrap').addEventListener('pointerdown', e => { if(e.target === $('modalWrap')) closeModal(); });
+
+/* online library (Poly Haven). Works where the page is allowed to reach other sites. */
+const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, loading:false, dead:false };
+async function libLoad(){
+  if(lib.all || lib.loading || lib.dead) return; lib.loading = true; $('libMsg').textContent = 'Loading the library…';
+  try{ const r = await fetch(PH + '/assets?t=models'); if(!r.ok) throw new Error(r.status); lib.all = await r.json(); $('libMsg').textContent = ''; }
+  catch(e){ lib.dead = true; $('libMsg').textContent = 'The online library cannot be reached from this page. It works on the hosted site.'; }
+  lib.loading = false; libRender();
+}
+function libRender(){
+  const g = $('libGrid'); g.innerHTML = ''; if(!lib.all) return;
+  const q = ($('libQ').value.trim() || $('oDesc').value.trim()).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+  let items = Object.entries(lib.all).map(([id, a]) => { const hay = (a.name + ' ' + (a.tags || []).join(' ') + ' ' + (a.categories || []).join(' ')).toLowerCase(); let sc = 0; for(const w of q) if(hay.includes(w)) sc += a.name.toLowerCase().includes(w) ? 3 : 1; return { id, a, sc }; });
+  items = q.length ? items.filter(x => x.sc > 0).sort((x, y) => y.sc - x.sc || (y.a.download_count || 0) - (x.a.download_count || 0)) : items.sort((x, y) => (y.a.download_count || 0) - (x.a.download_count || 0));
+  for(const { id, a } of items.slice(0, 30)){
+    const b = document.createElement('button'); b.type = 'button'; if(id === lib.pick) b.classList.add('on');
+    const im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = a.thumbnail_url || `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=128&height=128`;
+    const t = document.createElement('span'); t.textContent = a.name; b.append(im, t);
+    b.onclick = () => { lib.pick = lib.pick === id ? null : id; libRender(); $('libMsg').textContent = lib.pick ? `Picked: ${a.name}` : ''; }; g.appendChild(b);
+  }
+  if(!items.length) $('libMsg').textContent = 'No free model matches. Try a simpler word.'; else if(!lib.pick) $('libMsg').textContent = '';
+}
+async function libFetch(id){
+  const r = await fetch(`${PH}/files/${id}`); if(!r.ok) throw new Error('files ' + r.status); const f = await r.json();
+  const res = f.gltf && (f.gltf['1k'] || f.gltf['2k'] || Object.values(f.gltf)[0]); const g = res && res.gltf; if(!g) throw new Error('no gltf');
+  const get = async u => { const x = await fetch(u); if(!x.ok) throw new Error('file ' + x.status); return x.arrayBuffer(); };
+  const files = {}; const main = await get(g.url);
+  await Promise.all(Object.entries(g.include || {}).map(async ([path, v]) => { files[path] = await get(v.url); }));
+  return { main, files };
+}
+let libT = 0; $('libQ').addEventListener('input', () => { clearTimeout(libT); libT = setTimeout(libRender, 150); });
+$('bAddObj').onclick = () => { $('oDesc').value = ''; $('oNote').value = ''; $('oFile').value = ''; $('libQ').value = ''; lib.pick = null; openModal('objModal'); $('oDesc').focus(); libLoad().then(libRender); libRender(); };
+$('oDesc').addEventListener('input', () => { if(!$('libQ').value){ clearTimeout(libT); libT = setTimeout(libRender, 250); } });
+$('oCreate').onclick = async () => {
+  const f = $('oFile').files[0]; const desc = $('oDesc').value.trim() || (f ? f.name.replace(/\.[^.]+$/, '') : '') || (lib.pick && lib.all ? lib.all[lib.pick].name : ''); if(!desc){ $('oDesc').focus(); toast('Describe the object first.'); return; }
+  const o = { id:uid(), room:cur.id, desc, note:$('oNote').value.trim(), rotY:yaw, scale:1, wallN:null, pos:[0,0,0] };
+  if(f){ o.fileId = uid(); await filePut(o.fileId, await f.arrayBuffer()); }
+  else if(lib.pick){
+    $('oCreate').disabled = true; $('libMsg').textContent = 'Fetching the model…';
+    try{ const b = await libFetch(lib.pick); o.fileId = uid(); o.real = true; o.src = 'Poly Haven: ' + lib.pick; await filePut(o.fileId, b); }
+    catch(e){ console.warn(e); $('libMsg').textContent = 'That model could not be fetched. Try another, or create without one.'; $('oCreate').disabled = false; return; }
+    $('oCreate').disabled = false;
+  }
+  const p = new THREE.Vector3(pos.x - Math.sin(yaw) * 1.6, 0, pos.z - Math.cos(yaw) * 1.6); clampToRoom(p); o.pos = [p.x, 0, p.z];
+  P.objects.push(o); P.route.push(o.id); save(); closeModal();
+  const n = await makeObjNode(o); objNodes.set(o.id, n); objGroup.add(n); applyObjXf(o); rebuildRoute();
+  select(o.id, { edit:true }); placing = true; renderCard(); renderCount(); if(mapOpen()) drawMap();
+  toast(matchMedia('(pointer:coarse)').matches ? 'Tap where it should go.' : 'Point at a floor, shelf or wall and click to set it down.', 4200);
+};
+$('oDesc').addEventListener('keydown', e => { if(e.key === 'Enter') $('oNote').focus(); }); $('oNote').addEventListener('keydown', e => { if(e.key === 'Enter') $('oCreate').click(); });
+
+function freeWalls(r){ return Object.keys(WALLS).filter(w => !r.doors.some(d => d.wall === w)); }
+function fillWalls(){ const r = roomById($('nFrom').value); $('nWall').innerHTML = r ? freeWalls(r).map(w => `<option value="${w}">${WALLS[w]} wall</option>`).join('') : ''; }
+function openRoomModal(){
+  if(P.rooms.length >= MAX_ROOMS){ toast(`This version holds ${MAX_ROOMS} rooms.`); return; }
+  $('nName').value = ''; $('nSplat').value = ''; $('nCol').value = '';
+  $('nTheme').innerHTML = Object.entries(THEMES).map(([k, t]) => `<option value="${k}">${t.label}</option>`).join('');
+  const unused = Object.keys(THEMES).find(k => !P.rooms.some(r => r.theme === k)); if(unused) $('nTheme').value = unused;
+  const from = P.rooms.filter(r => freeWalls(r).length); $('nFrom').innerHTML = from.map(r => `<option value="${r.id}">${r.name}</option>`).join('') + '<option value="">No door yet</option>';
+  if(from.some(r => r.id === cur.id)) $('nFrom').value = cur.id; fillWalls(); openModal('roomModal'); $('nName').focus();
+}
+$('nFrom').onchange = fillWalls;
+$('nCreate').onclick = async () => {
+  const theme = $('nTheme').value, [w, d] = SIZES[$('nSize').value]; const sf = $('nSplat').files[0], cf = $('nCol').files[0];
+  const room = { id:uid(), name:$('nName').value.trim() || (sf ? sf.name.replace(/\.[^.]+$/, '') : THEMES[theme].label), theme, w, d, h:3.2, doors:[] };
+  if(sf){ room.splat = { fileId:uid(), name:sf.name, flip:true, turn:0, scale:1, y:0 }; await filePut(room.splat.fileId, await sf.arrayBuffer()); if(cf){ room.splat.colId = uid(); await filePut(room.splat.colId, await cf.arrayBuffer()); } }
+  const from = roomById($('nFrom').value), wall = $('nWall').value;
+  if(from && wall){ from.doors.push({ wall, to:room.id }); room.doors.push({ wall:OPP[wall], to:from.id }); }
+  P.rooms.push(room); save(); closeModal(); PANELS.forEach(p => $(p).classList.remove('show'));
+  const back = room.doors[0]; let at = null; if(back){ const p = doorPos(room, back.wall), n = wallNormal(back.wall); at = { pos:p.clone().addScaledVector(n, 1).setY(EYE), yaw:Math.atan2(-n.x, -n.z) }; }
+  await enterRoom(room, at); toast(sf ? 'Room added. Use Room to flip, turn or resize the scene if it looks wrong.' : 'Room added.', 4200);
+};
+
+/* ---------- card buttons ---------- */
+$('cardClose').onclick = closeCard;
+$('cardEdit').onclick = () => { editing = !editing; if(!editing) placing = false; renderCard(); };
+$('reveal').onclick = () => { revealed = true; renderCard(); };
+$('noteEdit').addEventListener('input', e => { const o = objById(sel); if(o){ o.note = e.target.value; save(); } });
+$('eMove').onclick = () => { placing = !placing; renderCard(); if(placing) toast(matchMedia('(pointer:coarse)').matches ? 'Tap where it should go.' : 'Point and click to set it down.'); };
+$('eRotL').onclick = () => nudge(o => o.rotY += Math.PI / 8); $('eRotR').onclick = () => nudge(o => o.rotY -= Math.PI / 8);
+$('eBigger').onclick = () => nudge(o => o.scale = Math.min(8, o.scale * 1.2)); $('eSmaller').onclick = () => nudge(o => o.scale = Math.max(.15, o.scale / 1.2));
+$('eUp').onclick = () => nudge(o => o.pos[1] = Math.min(cur.h - .2, o.pos[1] + .15)); $('eDown').onclick = () => nudge(o => o.pos[1] = Math.max(0, o.pos[1] - .15));
+$('eSnap').onclick = () => { snapOn = !snapOn; renderCard(); toast(snapOn ? 'Objects will sit on the surface you point at.' : 'Free placement: objects slide at their current height. Use ↑ and ↓ for mid-air.', 3800); };
+function moveInRoute(d){ const i = P.route.indexOf(sel), j = i + d; if(i < 0 || j < 0 || j >= P.route.length) return; [P.route[i], P.route[j]] = [P.route[j], P.route[i]]; curLocus = j; save(); refreshNumbers(); rebuildRoute(); renderCard(); renderCount(); if(mapOpen()) drawMap(); }
+$('eEarlier').onclick = () => moveInRoute(-1); $('eLater').onclick = () => moveInRoute(1);
+let delArm = false; $('eDelete').onclick = () => {
+  if(!delArm){ delArm = true; $('eDelete').textContent = 'Click again to delete'; setTimeout(() => { delArm = false; $('eDelete').textContent = 'Delete'; }, 2500); return; }
+  delArm = false; $('eDelete').textContent = 'Delete'; const id = sel; P.objects = P.objects.filter(o => o.id !== id); P.route = P.route.filter(i => i !== id); const n = objNodes.get(id); if(n){ objGroup.remove(n); objNodes.delete(id); }
+  curLocus = Math.min(curLocus, P.route.length - 1); closeCard(); refreshNumbers(); rebuildRoute(); renderCount(); save(); if(mapOpen()) drawMap();
+};
+
+/* ---------- bottom bar ---------- */
+$('bNext').onclick = () => { stopTour(); goLocus(curLocus + 1); }; $('bPrev').onclick = () => { stopTour(); goLocus(curLocus < 0 ? P.route.length - 1 : curLocus - 1); };
+$('bTour').onclick = () => { if(tour.on) stopTour(); else runTour(); };
+$('bQuiz').onclick = () => { quiz = !quiz; $('bQuiz').classList.toggle('on', quiz); $('bQuiz').textContent = quiz ? 'Notes hidden' : 'Hide notes'; revealed = false; renderCard(); };
+$('hintOk').onclick = () => { $('hint').style.display = 'none'; try{ localStorage.setItem('mpb.hint', '1'); }catch(e){} };
+try{ if(localStorage.getItem('mpb.hint')) $('hint').style.display = 'none'; }catch(e){}
+if(matchMedia('(pointer:coarse)').matches) $('hintText').textContent = 'Drag to look around. Hold the lower left of the screen to walk. Tap the floor to glide there.';
+
+/* ---------- start ---------- */
+renderCount();
+buildRoom(P.rooms[0]).then(() => { pos.set(1.2, EYE, Math.min(P.rooms[0].d / 2 - .8, 2.6)); yaw = .25; pitch = -.08; clampToRoom(pos); });
+requestAnimationFrame(frame);
+window.__mpb = { get P(){ return P; }, pos, goLocus, enterRoom, get cur(){ return cur; }, click };
+</script>
+</body>
+</html>
