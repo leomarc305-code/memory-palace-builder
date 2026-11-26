@@ -184,6 +184,7 @@ a{color:var(--brass)}
     <label><span>Size of the scene: <b id="rScaleV"></b></span><input id="rScale" type="range" min="0.2" max="5" step="0.05"></label>
     <label><span>Floor height: <b id="rYV"></b></span><input id="rY" type="range" min="-3" max="3" step="0.05"></label>
   </div>
+  <div class="row"><button id="rReal">Real furniture</button></div>
   <div class="row"><button id="rAdd" class="primary">+ Add a room</button><span class="grow"></span><button id="rDelete" class="danger">Delete room</button></div>
   <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0">
   <label><span>Palace name</span><input id="pName" type="text"></label>
@@ -378,6 +379,7 @@ let colliders = [];             // furniture boxes {min:[x,z], max:[x,z]}
 let doorHits = [];              // door meshes
 let colliderMeshes = null;      // from a room file's walls-and-floor file
 let splatRoot = null, spark = null, buildToken = 0;
+let slots = [];                 // furniture places that a real model can take over
 
 function doorPos(room, wall){
   const hw = room.w / 2, hd = room.d / 2;
@@ -397,36 +399,82 @@ function furnish(room){
   const { w, d, theme } = room, hw = w / 2, hd = d / 2;
   const lamp = (x, y, z, col, power = 9) => { const l = new THREE.PointLight(col, power, 14, 1.6); l.position.set(x, y, z); roomGroup.add(l); const b = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 8), new THREE.MeshBasicMaterial({ color:col })); b.position.copy(l.position); roomGroup.add(b); };
   const T = THEMES[theme];
+  const slot = (meshes, o) => slots.push({ meshes, ...o });
   if(theme === 'library'){
     const sw = hw - 1.3, bt = booksTex();
-    for(const sx of [-1, 1]){ const m = std('#ffffff', { map:bt.clone() }); m.map.repeat.set(sw / 1.6, 1.4); m.map.needsUpdate = true; addBox(sx * (.9 + sw / 2), 1.3, -hd + .22, sw, 2.6, .44, m); }
-    addBox(-hw + .22, 1.3, hd / 2 - .2, .44, 2.6, hd - 1.4, std('#3a2415'));
+    for(const sx of [-1, 1]){ const m = std('#ffffff', { map:bt.clone() }); m.map.repeat.set(sw / 1.6, 1.4); m.map.needsUpdate = true; const b = addBox(sx * (.9 + sw / 2), 1.3, -hd + .22, sw, 2.6, .44, m); slot([b], { ids:['Shelf_01'], x:sx * (.9 + sw / 2), z:-hd, back:[0, 1], rot:0, h:2.3, span:sw }); }
+    slot([addBox(-hw + .22, 1.3, hd / 2 - .2, .44, 2.6, hd - 1.4, std('#3a2415'))], { ids:['GothicCabinet_01','Shelf_01'], x:-hw, z:hd / 2 - .2, back:[1, 0], rot:Math.PI / 2, h:2.3 });
     addBox(0, .02, .4, 3.2, .03, 2.2, std('#7a2622'), { collide:false });
-    addBox(0, .74, -.4, 1.5, .08, .8, std('#4a2f1c')); for(const [x, z] of [[-.65,-.72],[.65,-.72],[-.65,-.08],[.65,-.08]]) addBox(x, .35, z, .08, .7, .08, std('#3a2415'), { collide:false, pick:false });
-    addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'));
+    { const parts = [addBox(0, .74, -.4, 1.5, .08, .8, std('#4a2f1c'))]; for(const [x, z] of [[-.65,-.72],[.65,-.72],[-.65,-.08],[.65,-.08]]) parts.push(addBox(x, .35, z, .08, .7, .08, std('#3a2415'), { collide:false, pick:false })); slot(parts, { ids:['WoodenTable_03','ClassicConsole_01'], x:0, z:-.4, rot:0, h:.78 }); }
+    slot([], { ids:['Lantern_01'], x:-.5, z:-.5, y:.78, rot:.5, h:.3 }); slot([], { ids:['Chandelier_01','Chandelier_03'], x:0, z:.9, hang:true, h:.8 });
+    slot([addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'))], { ids:['ArmChair_01','GreenChair_01'], x:hw - 1.1, z:hd - 1.2, rot:Math.atan2(-(hw - 1.1), -(hd - 1.2)), h:1.05 });
     lamp(-hw + 1.2, 2.3, 0, T.light); lamp(hw - 1.4, 2.3, hd - 1.4, T.light); lamp(0, 1.25, -.4, '#ffb766', 4);
   } else if(theme === 'kitchen'){
-    addBox(hw / 2 + .2, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')); addBox(hw / 2 + .2, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'));
-    addBox(-hw / 2 - .2, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')); addBox(-hw / 2 - .2, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'));
-    addBox(0, .45, 0, 1.8, .9, .9, std('#8b5e3c')); addBox(0, .92, 0, 2, .05, 1.05, std('#d8cbb0'));
+    for(const sx of [1, -1]){ const cx = sx * (hw / 2 + .2); slot([addBox(cx, .45, -hd + .32, hw - 1.6, .9, .64, std('#6c7f7a')), addBox(cx, .92, -hd + .32, hw - 1.5, .05, .68, std('#e9e4d8'))], { kw:['counter','sideboard','dresser'], ids:['GothicCommode_01'], x:cx, z:-hd, back:[0, 1], rot:0, h:.945, span:hw - 1.6 }); }
+    slot([addBox(0, .45, 0, 1.8, .9, .9, std('#8b5e3c')), addBox(0, .92, 0, 2, .05, 1.05, std('#d8cbb0'))], { ids:['ClassicConsole_01','WoodenTable_03'], x:0, z:0, rot:0, h:.945 });
     addBox(-hw / 2 - .2, 1.75, -hd + .16, hw - 1.8, .05, .3, std('#8b5e3c'), { collide:false });
-    addBox(hw - .5, 1, hd - 1.4, .8, 2, .8, std('#d9d6cf'));
+    slot([addBox(hw - .5, 1, hd - 1.4, .8, 2, .8, std('#d9d6cf'))], { kw:['fridge','refrigerator'], ids:['Shelf_01'], x:hw, z:hd - 1.4, back:[-1, 0], rot:-Math.PI / 2, h:2 });
     lamp(0, 2.4, 0, T.light, 12); lamp(-hw + 1.5, 2.4, hd - 1.5, T.light, 7);
   } else if(theme === 'gallery'){
-    for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]) addBox(x, .5, z, .6, 1, .6, std('#f5f2ec'));
-    addBox(0, .23, 0, 1.8, .46, .5, std('#3b3a38'));
+    for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]) slot([addBox(x, .5, z, .6, 1, .6, std('#f5f2ec'))], { kw:['plinth','pedestal'], x, z, rot:0, h:1 });
+    slot([addBox(0, .23, 0, 1.8, .46, .5, std('#3b3a38'))], { kw:['bench'], ids:['Ottoman_01'], x:0, z:0, rot:0, h:.5 });
     lamp(-hw / 2, 2.7, 0, T.light, 10); lamp(hw / 2, 2.7, 0, T.light, 10);
   } else if(theme === 'garden'){
-    for(const [x, z] of [[-hw + .6, -hd + .6],[hw - .6, -hd + .6],[-hw + .6, hd - .6],[hw - .6, hd - .6]]){ addBox(x, .3, z, .8, .6, .8, std('#a0593a')); const b = new THREE.Mesh(new THREE.SphereGeometry(.55, 14, 10), std('#3f7a45')); b.position.set(x, 1, z); roomGroup.add(b); pickables.push(b); }
+    for(const [x, z] of [[-hw + .6, -hd + .6],[hw - .6, -hd + .6],[-hw + .6, hd - .6],[hw - .6, hd - .6]]){ const pot = addBox(x, .3, z, .8, .6, .8, std('#a0593a')); const b = new THREE.Mesh(new THREE.SphereGeometry(.55, 14, 10), std('#3f7a45')); b.position.set(x, 1, z); roomGroup.add(b); pickables.push(b); slot([pot, b], { kw:['potted','planter'], x, z, rot:0, h:1.4 }); }
     const f = new THREE.Mesh(new THREE.CylinderGeometry(.9, 1, .5, 24), std('#b9b6ad')); f.position.set(0, .25, 0); roomGroup.add(f); pickables.push(f); colliders.push({ min:[-1,-1], max:[1,1] });
     const wtr = new THREE.Mesh(new THREE.CylinderGeometry(.78, .78, .04, 24), std('#5aa7b8', { roughness:.2 })); wtr.position.set(0, .5, 0); roomGroup.add(wtr);
-    addBox(-hw / 2, .23, hd - .5, 1.4, .46, .4, std('#7b5a3a'));
+    slot([addBox(-hw / 2, .23, hd - .5, 1.4, .46, .4, std('#7b5a3a'))], { kw:['bench'], ids:['Rockingchair_01'], x:-hw / 2, z:hd - .7, rot:Math.PI, h:.5 });
     lamp(0, 2.7, 0, T.light, 14); lamp(hw - 1.5, 2.2, -hd + 1.5, '#fff3c4', 6);
   } else {
     for(const [x, z] of [[-hw / 2, -hd / 2],[hw / 2, -hd / 2],[-hw / 2, hd / 2],[hw / 2, hd / 2]]){ const c = new THREE.Mesh(new THREE.CylinderGeometry(.28, .32, room.h, 14), std('#6b6872')); c.position.set(x, room.h / 2, z); roomGroup.add(c); pickables.push(c); colliders.push({ min:[x - .32, z - .32], max:[x + .32, z + .32] }); }
-    addBox(0, .3, -hd + .7, 1.2, .6, .7, std('#5a3d22')); addBox(0, .63, -hd + .7, 1.24, .06, .74, std('#c39a3d'));
-    addBox(hw - .7, .45, 0, .7, .9, 1.6, std('#3d3b42'));
+    slot([addBox(0, .3, -hd + .7, 1.2, .6, .7, std('#5a3d22')), addBox(0, .63, -hd + .7, 1.24, .06, .74, std('#c39a3d'))], { kw:['chest','trunk'], ids:['Barrel_01'], x:0, z:-hd + .7, rot:0, h:.7 });
+    slot([addBox(hw - .7, .45, 0, .7, .9, 1.6, std('#3d3b42'))], { ids:['Barrel_02','Barrel_01'], x:hw - .7, z:-.4, rot:.4, h:.9 }); slot([], { ids:['Barrel_01'], x:hw - .7, z:.4, rot:1.3, h:.9 }); slot([], { ids:['Chandelier_03','Chandelier_01'], x:0, z:0, hang:true, h:1 });
     lamp(0, 2.3, 0, T.light, 9); lamp(-hw + 1, 1.8, hd - 1, '#ff9d4d', 6);
+  }
+}
+
+/* Swap the plain stand-in furniture for real models from the online library. */
+const phCache = new Map();
+async function phProto(id){
+  if(phCache.has(id)) return phCache.get(id);
+  const job = (async () => {
+    let buf = await fileGet('ph_' + id); if(!buf){ buf = await libFetch(id); await filePut('ph_' + id, buf); }
+    const gl = await parseAny(buf); const box = new THREE.Box3().setFromObject(gl.scene), sz = box.getSize(new THREE.Vector3());
+    gl.scene.position.set(-(box.min.x + sz.x / 2), -box.min.y, -(box.min.z + sz.z / 2)); const g = new THREE.Group(); g.add(gl.scene); return { g, sz };
+  })();
+  phCache.set(id, job); job.catch(() => phCache.delete(id)); return job;
+}
+function resolveSlot(sl){
+  const models = lib.all || {}, out = [];
+  if(sl.kw){
+    const c = []; for(const [id, a] of Object.entries(models)){ if(a.type !== undefined && a.type !== 2) continue; const words = (a.name || '').toLowerCase().split(/[^a-z]+/); if(!sl.kw.some(k => words.includes(k))) continue;
+      const d = a.dimensions; if(!d || d.length < 3) continue; const r = sl.h / (d[2] / 1000); if(r < .6 || r > 1.6 || d[0] / 1000 > 2.6) continue; c.push([id, a.download_count || 0]); }
+    c.sort((x, y) => y[1] - x[1]); out.push(...c.slice(0, 2).map(x => x[0]));
+  }
+  for(const id of sl.ids || []) if(models[id]) out.push(id);
+  return out;
+}
+async function upgradeFurniture(room, token){
+  if(P.realFurniture === false || !slots.length) return;
+  await libLoad(); if(!lib.all || token !== buildToken) return;
+  let told = false;
+  for(const sl of slots){
+    let proto = null;
+    for(const id of resolveSlot(sl)){
+      if(!told && !phCache.has(id) && !(await fileGet('ph_' + id))){ told = true; toast('Fetching real furniture. The first visit to a room takes a little while.', 5000); }
+      try{ proto = await phProto(id); break; }catch(e){ console.warn('furniture', id, e); }
+    }
+    if(token !== buildToken) return; if(!proto) continue;
+    const { g, sz } = proto; let s = sl.h / sz.y; if(s < .6 || s > 1.6) s = 1;
+    const n = sl.span ? Math.max(1, Math.floor(sl.span / (sz.x * s + .03))) : 1, step = sz.x * s + .03;
+    for(let i = 0; i < n; i++){
+      const c = g.clone(true); c.scale.setScalar(s); c.rotation.y = sl.rot || 0;
+      let x = sl.x, z = sl.z; const off = (i - (n - 1) / 2) * step;
+      if(sl.back){ x += sl.back[0] * (sz.z * s / 2 + .02) + (sl.back[0] ? 0 : off); z += sl.back[1] * (sz.z * s / 2 + .02) + (sl.back[1] ? 0 : off); } else x += off;
+      c.position.set(x, sl.hang ? room.h - sz.y * s : (sl.y || 0), z); roomGroup.add(c); c.updateMatrixWorld(true);
+      if(!sl.hang) c.traverse(m => { if(m.isMesh) pickables.push(m); });
+    }
+    for(const m of sl.meshes){ m.visible = false; const k = pickables.indexOf(m); if(k >= 0) pickables.splice(k, 1); }
   }
 }
 
@@ -459,7 +507,7 @@ async function buildRoom(room){
   const token = ++buildToken;
   disposeGroup(roomGroup); disposeGroup(fxGroup);
   if(splatRoot){ scene.remove(splatRoot); splatRoot.traverse(o => o.dispose && o.dispose()); splatRoot = null; }
-  pickables = []; colliders = []; doorHits = []; colliderMeshes = null; cur = room;
+  pickables = []; colliders = []; doorHits = []; slots = []; colliderMeshes = null; cur = room;
   const { w, d, h } = room, T = THEMES[room.theme] || THEMES.gallery, isSplat = !!room.splat;
   roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55));
   const hide = isSplat ? { transparent:true, opacity:0, depthWrite:false } : {};
@@ -478,6 +526,7 @@ async function buildRoom(room){
   }
   buildDoors(room);
   rebuildObjects(); rebuildRoute(); renderRooms(); drawMap();
+  if(!isSplat) upgradeFurniture(room, token).catch(e => console.warn(e));
   if(isSplat){
     splatRoot = new THREE.Group(); scene.add(splatRoot); applySplatXf(room);
     const buf = await fileGet(room.splat.fileId);
@@ -515,16 +564,19 @@ function placeholderModel(desc){
   const lab = textSprite(desc.replace(/^Example:\s*/i, ''), { size:30, fixed:true }); lab.position.y = .78; g.add(lab); g.userData.labelY = .78;
   return g;
 }
+async function parseAny(buf){
+  if(buf.main){   // a .gltf with separate texture and data files, as the online library serves them
+    const urls = {}, made = []; for(const [k, b] of Object.entries(buf.files)){ const u = URL.createObjectURL(new Blob([b])); urls[k] = u; made.push(u); }
+    const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => { const key = decodeURIComponent(u).replace(/^(\.\/)+/, ''); return urls[key] || urls[key.split('/').pop()] || u; });
+    const gl = await new GLTFLoader(mgr).parseAsync(buf.main.slice(0), ''); setTimeout(() => made.forEach(u => URL.revokeObjectURL(u)), 20000); return gl;
+  }
+  return new GLTFLoader().parseAsync(buf.slice(0), '');
+}
 async function glbModel(o){
   let src = gltfCache.get(o.fileId);
   if(!src){
     const buf = await fileGet(o.fileId); if(!buf) return null;
-    let gl;
-    if(buf.main){   // a .gltf with separate texture and data files, as the online library serves them
-      const urls = {}, made = []; for(const [k, b] of Object.entries(buf.files)){ const u = URL.createObjectURL(new Blob([b])); urls[k] = u; made.push(u); }
-      const mgr = new THREE.LoadingManager(); mgr.setURLModifier(u => { const key = decodeURIComponent(u).replace(/^(\.\/)+/, ''); return urls[key] || urls[key.split('/').pop()] || u; });
-      gl = await new GLTFLoader(mgr).parseAsync(buf.main.slice(0), ''); setTimeout(() => made.forEach(u => URL.revokeObjectURL(u)), 20000);
-    } else gl = await new GLTFLoader().parseAsync(buf.slice(0), '');
+    const gl = await parseAny(buf);
     const box = new THREE.Box3().setFromObject(gl.scene), sz = box.getSize(new THREE.Vector3()), big = Math.max(sz.x, sz.y, sz.z, 1e-4);
     const k = (o.real && big > .08 && big < 2.6) ? 1 : .6 / big;
     const wrap = new THREE.Group(); gl.scene.position.set(-(box.min.x + sz.x / 2) * k, -box.min.y * k, -(box.min.z + sz.z / 2) * k); gl.scene.scale.setScalar(k); wrap.add(gl.scene);
@@ -657,6 +709,7 @@ function goDoor(dr){
 
 /* ---------- picking ---------- */
 function pick(x, y, list, rec = false){
+  list = list.filter(o => o.visible !== false);
   const r = canvas.getBoundingClientRect(); ray.setFromCamera(new THREE.Vector2(((x - r.left) / r.width) * 2 - 1, -((y - r.top) / r.height) * 2 + 1), camera);
   return ray.intersectObjects(list, rec)[0] || null;
 }
@@ -856,6 +909,7 @@ $('viewSave').onclick = () => { const name = $('viewName').value.trim() || `View
 function renderRoomPanel(){
   $('rName').value = cur.name; $('pName').value = P.name; const s = cur.splat; $('rSplat').style.display = s ? 'flex' : 'none';
   if(s){ $('rScale').value = s.scale || 1; $('rScaleV').textContent = (s.scale || 1).toFixed(2) + '×'; $('rY').value = s.y || 0; $('rYV').textContent = (s.y || 0).toFixed(2) + ' m'; }
+  $('rReal').classList.toggle('on', P.realFurniture !== false); $('rReal').textContent = P.realFurniture !== false ? 'Real furniture: on' : 'Real furniture: off'; $('rReal').style.display = cur.splat ? 'none' : '';
   $('rDelete').disabled = P.rooms.length < 2; $('rAdd').disabled = P.rooms.length >= MAX_ROOMS; resetArm();
 }
 $('rName').addEventListener('input', e => { cur.name = e.target.value || 'Room'; save(); renderRooms(); });
@@ -865,6 +919,7 @@ $('rTurn').onclick = () => { cur.splat.turn = ((cur.splat.turn || 0) + 1) % 4; a
 $('rScale').oninput = e => { cur.splat.scale = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rY').oninput = e => { cur.splat.y = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rAdd').onclick = openRoomModal;
+$('rReal').onclick = () => { P.realFurniture = P.realFurniture === false; save(); renderRoomPanel(); const at = { pos:pos.clone(), yaw, pitch }; enterRoom(cur, at); };
 let armed = null; function resetArm(){ armed = null; $('rDelete').textContent = 'Delete room'; $('pReset').textContent = 'Start over with the example'; }
 $('rDelete').onclick = () => {
   if(armed !== 'room'){ resetArm(); armed = 'room'; $('rDelete').textContent = 'Click again to delete this room and its objects'; return; }
@@ -883,7 +938,7 @@ $('modalWrap').addEventListener('pointerdown', e => { if(e.target === $('modalWr
 const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, loading:false, dead:false };
 async function libLoad(){
   if(lib.all || lib.loading || lib.dead) return; lib.loading = true; $('libMsg').textContent = 'Loading the library…';
-  try{ const r = await fetch(PH + '/assets?t=models'); if(!r.ok) throw new Error(r.status); lib.all = await r.json(); $('libMsg').textContent = ''; }
+  try{ const r = await fetch(PH + '/assets?t=models'); if(!r.ok) throw new Error(r.status); const all = await r.json(); lib.all = {}; for(const [id, a] of Object.entries(all)) if(a.type === undefined || a.type === 2) lib.all[id] = a; $('libMsg').textContent = ''; }
   catch(e){ lib.dead = true; $('libMsg').textContent = 'The online library cannot be reached from this page. It works on the hosted site.'; }
   lib.loading = false; libRender();
 }
