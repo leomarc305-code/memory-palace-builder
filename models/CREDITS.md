@@ -1,0 +1,26 @@
+# Model credits
+
+The 3D models in this folder were downloaded from Sketchfab and are used under the Creative Commons licences below. Texture resolution was reduced by Sketchfab's own 1k download option; the app rotates and scales them to fit its rooms.
+
+- [Antique Wall Clock](https://sketchfab.com/3d-models/antique-wall-clock-174a3fc826414bfc9693d9b00f43fe57) by [3DGunsmith](https://sketchfab.com/3DGunsmith), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Antique Wardrobe](https://sketchfab.com/3d-models/antique-wardrobe-9e194868da754d55afc876127dc8f74b) by [matejbiskup97](https://sketchfab.com/matejbiskup97), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Bookshelf](https://sketchfab.com/3d-models/bookshelf-8df6adc634bd4004894a5e70565dc52a) by [Idmenthal](https://sketchfab.com/idmental.id), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Cute Toaster](https://sketchfab.com/3d-models/cute-toaster-9f6d03cf29f245ad97c51a56e9b1ca90) by [blkelly](https://sketchfab.com/blkelly), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Desk lamp](https://sketchfab.com/3d-models/desk-lamp-7377ec591df04445a1aae370017aaa13) by [KaramellGlass](https://sketchfab.com/KaramellGlass), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Dining Chair](https://sketchfab.com/3d-models/dining-chair-05e815d0f2f64647b646e9b71f8ec9ed) by [soidev](https://sketchfab.com/soidev), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [dining table](https://sketchfab.com/3d-models/dining-table-f852064a2ddb40419f7c764b3cfb0d3e) by [Jelvehkar](https://sketchfab.com/alihoseini13000), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Floor Lamp](https://sketchfab.com/3d-models/floor-lamp-0143e8771329468aa3a37746bbe7d62a) by [HippoStance](https://sketchfab.com/hippostance), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Golden Globe Decoration](https://sketchfab.com/3d-models/golden-globe-decoration-328498b205c64897a78d24ddb8a73703) by [Nicholas-3D](https://sketchfab.com/Nicholas01), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Kitchen Sink](https://sketchfab.com/3d-models/kitchen-sink-504248ed68e3480a807aced6f002b2d5) by [HippoStance](https://sketchfab.com/hippostance), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Microwave Oven](https://sketchfab.com/3d-models/microwave-oven-3421e492257f40959859104f46128304) by [MustafaYerebasmaz](https://sketchfab.com/Mustafa97), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [nightstand](https://sketchfab.com/3d-models/nightstand-ac166ce0807345a385b051b06f7960f1) by [ilyafom1](https://sketchfab.com/ilyafom1), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Old Gas Stove and Oven](https://sketchfab.com/3d-models/old-gas-stove-and-oven-d98dd28d47424d7aaedfd33685af0427) by [Glowbox 3D](https://sketchfab.com/ra3id), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [old_leather_armchair](https://sketchfab.com/3d-models/old-leather-armchair-ae47fb3d061045569f1089aaabd840ca) by [VoGAn](https://sketchfab.com/radiosoldat.g), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Optimized Potted Plants](https://sketchfab.com/3d-models/optimized-potted-plants-967b4bf23fac4098993776fcfc2d3318) by [Nicholas-3D](https://sketchfab.com/Nicholas01), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Retro Television](https://sketchfab.com/3d-models/retro-television-e938241a182a4229ad48a1fc589e676e) by [Tom Seddon](https://sketchfab.com/bloodmeat08), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Soviet Fridge "ZIL Moskva"](https://sketchfab.com/3d-models/soviet-fridge-zil-moskva-ea1ea4d5847b4550bc58ef4107df6f94) by [seenoise](https://sketchfab.com/seenoise), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Toilet](https://sketchfab.com/3d-models/toilet-132a8ee2af3a40d39d270fbed3d3666c) by [HippoStance](https://sketchfab.com/hippostance), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Victorian Bed](https://sketchfab.com/3d-models/victorian-bed-c56b0776992041648ba5c1615f6e1fed) by [BATRIC_18](https://sketchfab.com/BATRIC_18), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Victorian Coffee Table](https://sketchfab.com/3d-models/victorian-coffee-table-ad38ff95b713412080992a48eab50899) by [Jamie McFarlane](https://sketchfab.com/jamiemcfarlane), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Victorian Lounge Sofa](https://sketchfab.com/3d-models/victorian-lounge-sofa-c7b7999b5c3d425bae23e74b669e97d6) by [Jamie McFarlane](https://sketchfab.com/jamiemcfarlane), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)
+- [Washbasin](https://sketchfab.com/3d-models/washbasin-06292c9fb8cc46058a7e0a9d3e69d012) by [Odlab](https://sketchfab.com/Odlab), licensed under [CC-BY-4.0](http://creativecommons.org/licenses/by/4.0/)

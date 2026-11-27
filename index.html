@@ -192,7 +192,7 @@ a{color:var(--brass)}
   <div class="row"><button id="rAdd" class="primary">+ Add a room</button><span class="grow"></span><button id="rDelete" class="danger">Delete room</button></div>
   <hr style="border:0;border-top:1px solid var(--line);width:100%;margin:2px 0">
   <label><span>Palace name</span><input id="pName" type="text"></label>
-  <div class="row"><button id="pReset" class="danger">Start over with the example</button></div>
+  <div class="row"><button id="pReset" class="danger">Start over with the example</button><button id="pCredits">Credits</button></div>
   <div class="note">Everything is saved in this browser on this device. Sharing by link arrives with the server phase.</div>
 </div>
 
@@ -203,6 +203,7 @@ a{color:var(--brass)}
     <label><span>What it stands for</span><input id="oNote" type="text" placeholder="the word, fact or list item"></label>
     <div id="lib" style="display:flex;flex-direction:column;gap:8px">
       <label><span>Pick a free 3D model</span><input id="libQ" type="text" placeholder="chair, lantern, skull, teapot…" autocomplete="off"></label>
+      <div id="stGrid" class="libgrid"></div>
       <div id="libGrid" class="libgrid"></div>
       <div class="small muted" id="libMsg"></div>
       <div class="small muted">Powered by <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a>. Free to use, no credit needed.</div>
@@ -215,6 +216,13 @@ a{color:var(--brass)}
     <input id="oFile" type="file" style="display:none">
     <div class="note">Text-to-3D is not connected yet. With no model picked and no file, a stand-in shape carries your description as a label.</div>
     <div class="row"><span class="grow"></span><button data-cancel>Cancel</button><button id="oCreate" class="primary">Create and place</button></div>
+  </div>
+  <div id="credModal" class="modal glass" role="dialog" aria-labelledby="credT">
+    <h2 id="credT">Credits</h2>
+    <div class="small muted">These 3D models are used under their Creative Commons licences. Sizes and facing were adjusted to fit the rooms.</div>
+    <div id="credList" class="small" style="display:flex;flex-direction:column;gap:6px;line-height:1.4"></div>
+    <div class="small">Furniture, floor and wall materials marked as real also come from <a href="https://polyhaven.com" target="_blank" rel="noopener">Poly Haven</a> (CC0).</div>
+    <div class="row"><span class="grow"></span><button data-cancel>Close</button></div>
   </div>
   <div id="roomModal" class="modal glass" role="dialog" aria-labelledby="roomT">
     <h2 id="roomT">New room</h2>
@@ -462,7 +470,7 @@ function furnish(room){
     addBox(0, .02, .4, 3.2, .03, 2.2, std('#7a2622'), { collide:false });
     { const parts = [addBox(0, .74, -.4, 1.5, .08, .8, std('#4a2f1c'))]; for(const [x, z] of [[-.65,-.72],[.65,-.72],[-.65,-.08],[.65,-.08]]) parts.push(addBox(x, .35, z, .08, .7, .08, std('#3a2415'), { collide:false, pick:false })); slot(parts, { ids:['WoodenTable_03','ClassicConsole_01'], x:0, z:-.4, rot:0, h:.78 }); }
     slot([], { ids:['Lantern_01'], x:-.5, z:-.5, y:.78, rot:.5, h:.3 }); slot([], { ids:['Chandelier_01','Chandelier_03'], x:0, z:.9, hang:true, h:.8 });
-    slot([addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'))], { ids:['ArmChair_01','GreenChair_01'], x:hw - 1.1, z:hd - 1.2, rot:Math.atan2(-(hw - 1.1), -(hd - 1.2)), h:1.05 });
+    slot([addBox(hw - 1.1, .28, hd - 1.2, .9, .56, .9, std('#5b2b2b'))], { st:'old_leather_armchair.glb', ids:['ArmChair_01','GreenChair_01'], x:hw - 1.1, z:hd - 1.2, rot:Math.atan2(-(hw - 1.1), -(hd - 1.2)), h:1.05 });
     lamp(-hw + 1.2, 2.3, 0, T.light); lamp(hw - 1.4, 2.3, hd - 1.4, T.light); lamp(0, 1.25, -.4, '#ffb766', 4);
   } else if(theme === 'kitchen'){
     kitchen(room, slot, lamp);
@@ -583,32 +591,34 @@ const ROOMS = {
     const { W, D, h } = F, wd = std(shade(T.fc, .8)), fab = std('#7d8a86', { roughness:.95 }), deco = { collide:false, pick:false };
     rug(F, 0, .25, Math.min(3.4, W - 2.4), 2.4, '#8a2f2b', '#e3c88f');
     slot([F.box(0, .3, -D / 2 + .25, 1.5, .6, .45, wd)], F.spot({ ids:['ClassicConsole_01','WoodenTable_03'], x:0, z:-D / 2, back:[0, 1], h:.62 }));
-    slot([F.box(0, 1.0, -D / 2 + .25, 1.15, .66, .06, std('#141518', { roughness:.3 })), F.box(0, .64, -D / 2 + .25, .3, .06, .2, std('#141518'), deco)], F.spot({ ids:['Television_01'], x:0, z:-D / 2 + .27, y:.62, h:.5 }));
-    slot([F.box(0, .22, 1.35, 2.0, .44, .85, fab), F.box(0, .62, 1.72, 2.0, .5, .2, fab, deco), F.box(-.92, .5, 1.35, .16, .26, .85, fab, deco), F.box(.92, .5, 1.35, .16, .26, .85, fab, deco)], F.spot({ ids:['Sofa_01'], x:0, z:1.4, rot:Math.PI, h:.8 }));
-    slot([F.box(0, .36, .1, 1.2, .06, .65, wd), F.box(0, .17, .1, 1.0, .34, .5, wd, deco)], F.spot({ ids:['CoffeeTable_01','WoodenTable_01'], x:0, z:.1, h:.42 }));
+    slot([F.box(0, 1.0, -D / 2 + .25, 1.15, .66, .06, std('#141518', { roughness:.3 })), F.box(0, .64, -D / 2 + .25, .3, .06, .2, std('#141518'), deco)], F.spot({ st:'retro_television.glb', ids:['Television_01'], x:0, z:-D / 2 + .3, y:.62, h:.5 }));
+    slot([], F.spot({ st:'antique_wall_clock.glb', x:0, z:-D / 2, back:[0, 1], y:1.85 }));
+    slot([F.box(0, .22, 1.35, 2.0, .44, .85, fab), F.box(0, .62, 1.72, 2.0, .5, .2, fab, deco), F.box(-.92, .5, 1.35, .16, .26, .85, fab, deco), F.box(.92, .5, 1.35, .16, .26, .85, fab, deco)], F.spot({ st:'victorian_lounge_sofa.glb', ids:['Sofa_01'], x:0, z:1.4, rot:Math.PI, h:.8 }));
+    slot([F.box(0, .36, .1, 1.2, .06, .65, wd), F.box(0, .17, .1, 1.0, .34, .5, wd, deco)], F.spot({ st:'victorian_coffee_table.glb', ids:['CoffeeTable_01','WoodenTable_01'], x:0, z:.1, h:.42 }));
     const ax = Math.min(2.0, W / 2 - .9);
-    for(const sx of [-1, 1]) slot([F.box(sx * ax, .25, .2, .8, .5, .8, fab), F.box(sx * (ax + .3), .6, .2, .2, .5, .8, fab, deco)], F.spot({ ids:sx < 0 ? ['ArmChair_01','GreenChair_01'] : ['GreenChair_01','ArmChair_01'], x:sx * ax, z:.2, rot:-sx * Math.PI / 2, h:1.05 }));
+    for(const sx of [-1, 1]) slot([F.box(sx * ax, .25, .2, .8, .5, .8, fab), F.box(sx * (ax + .3), .6, .2, .2, .5, .8, fab, deco)], F.spot({ st:'old_leather_armchair.glb', ids:sx < 0 ? ['ArmChair_01','GreenChair_01'] : ['GreenChair_01','ArmChair_01'], x:sx * ax, z:.2, rot:-sx * Math.PI / 2, h:1.05 }));
     if(W >= 7.5) for(const sx of [-1, 1]) slot([F.box(sx * (W / 2 - .7), 1.05, -D / 2 + .15, 1.0, 2.1, .3, wd)], F.spot({ ids:['Shelf_01'], x:sx * (W / 2 - .7), z:-D / 2, back:[0, 1], h:2.08 }));
     floorLamp(F, lamp, -W / 2 + .55, D / 2 - .6, T.light); plant(F, slot, W / 2 - .55, D / 2 - .6);
     slot([], F.spot({ ids:['Chandelier_02','Chandelier_01'], x:0, z:.3, hang:true, h:.85 })); { const [X, Z] = F.pt(0, .3); lamp(X, h - .9, Z, T.light, 11); }
   },
   bedroom(F, slot, lamp, T){
     const { W, D, h } = F, wd = std(shade(T.floor === 'planks' ? T.fc : '#6b4a30', .8)), linen = std('#eee9df', { roughness:.95 }), deco = { collide:false, pick:false };
-    slot([F.box(0, .28, -D / 2 + 1.08, 1.6, .56, 2.05, linen), F.box(0, .14, -D / 2 + 1.08, 1.7, .28, 2.15, wd, deco), F.box(0, .7, -D / 2 + .06, 1.7, 1.4, .1, wd), F.box(-.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(0, .58, -D / 2 + 1.55, 1.62, .06, 1.0, std('#6f8296', { roughness:.95 }), deco)], F.spot({ ids:['GothicBed_01'], x:0, z:-D / 2, back:[0, 1], h:1.5 }));
-    for(const sx of [-1, 1]){ slot([F.box(sx * 1.25, .3, -D / 2 + .25, .5, .6, .42, wd)], F.spot({ ids:['ClassicNightstand_01','WoodenTable_02'], x:sx * 1.25, z:-D / 2, back:[0, 1], h:.62 })); const [X, Z] = F.pt(sx * 1.25, -D / 2 + .25); lamp(X, 1.0, Z, T.light, 3.5); }
+    slot([F.box(0, .28, -D / 2 + 1.08, 1.6, .56, 2.05, linen), F.box(0, .14, -D / 2 + 1.08, 1.7, .28, 2.15, wd, deco), F.box(0, .7, -D / 2 + .06, 1.7, 1.4, .1, wd), F.box(-.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(.4, .63, -D / 2 + .4, .6, .14, .4, std('#ffffff'), deco), F.box(0, .58, -D / 2 + 1.55, 1.62, .06, 1.0, std('#6f8296', { roughness:.95 }), deco)], F.spot({ st:'victorian_bed.glb', ids:['GothicBed_01'], x:0, z:-D / 2, back:[0, 1], h:1.5 }));
+    for(const sx of [-1, 1]){ slot([F.box(sx * 1.25, .3, -D / 2 + .25, .5, .6, .42, wd)], F.spot({ st:'nightstand.glb', ids:['ClassicNightstand_01','WoodenTable_02'], x:sx * 1.25, z:-D / 2, back:[0, 1], h:.62 })); const [X, Z] = F.pt(sx * 1.25, -D / 2 + .25); lamp(X, 1.0, Z, T.light, 3.5); }
     slot([], F.spot({ ids:['Lantern_01'], x:-1.25, z:-D / 2 + .25, y:.62, h:.3 }));
     slot([F.box(W / 2 - .3, .5, .9, .55, 1.0, 1.2, wd)], F.spot({ ids:['GothicCommode_01'], x:W / 2, z:.9, back:[-1, 0], rot:-Math.PI / 2, h:1.1 }));
-    slot([F.box(-W / 2 + .9, .25, D / 2 - 1.1, .8, .5, .8, std('#8a7a6a', { roughness:.95 }))], F.spot({ ids:['ArmChair_01','Rockingchair_01'], x:-W / 2 + .9, z:D / 2 - 1.1, rot:Math.PI * .75, h:1.05 }));
+    slot([F.box(-W / 2 + .9, .25, D / 2 - 1.1, .8, .5, .8, std('#8a7a6a', { roughness:.95 }))], F.spot({ st:'old_leather_armchair.glb', ids:['ArmChair_01','Rockingchair_01'], x:-W / 2 + .9, z:D / 2 - 1.1, rot:Math.PI * .75, h:1.05 }));
+    slot([], F.spot({ st:'antique_wardrobe.glb', x:-W / 2, z:-.2, back:[1, 0], rot:Math.PI / 2 }));
     rug(F, 0, .9, 2.8, 1.8, '#cfc3ae', '#8c7b63'); plant(F, slot, W / 2 - .5, D / 2 - .5);
     { const [X, Z] = F.pt(0, .4); lamp(X, h - .5, Z, T.light, 9); }
   },
   dining(F, slot, lamp, T){
     const { W, D, h } = F, wd = std(shade(T.fc, .75)), deco = { collide:false, pick:false };
     rug(F, 0, 0, 3.6, 2.6, '#2f4a45', '#d9c08a');
-    const tb = [F.box(0, .73, 0, 2.3, .06, 1.0, wd)]; for(const [x, z] of [[-1, -.4],[1, -.4],[-1, .4],[1, .4]]) tb.push(F.box(x, .35, z, .08, .7, .08, wd, deco)); slot(tb, F.spot({ ids:['WoodenTable_01'], x:0, z:0, h:.76 }));
-    for(const [x, z, r] of [[-.65, -.85, 0],[.65, -.85, 0],[-.65, .85, Math.PI],[.65, .85, Math.PI],[-1.55, 0, Math.PI / 2],[1.55, 0, -Math.PI / 2]]) slot([F.box(x, .23, z, .45, .46, .45, wd), F.box(x - Math.sin(r) * .2, .7, z - Math.cos(r) * .2, r % Math.PI ? .06 : .45, .5, r % Math.PI ? .45 : .06, wd, deco)], F.spot({ ids:['GreenChair_01','SchoolChair_01'], x, z, rot:r, h:1.0 }));
+    const tb = [F.box(0, .73, 0, 2.3, .06, 1.0, wd)]; for(const [x, z] of [[-1, -.4],[1, -.4],[-1, .4],[1, .4]]) tb.push(F.box(x, .35, z, .08, .7, .08, wd, deco)); slot(tb, F.spot({ st:'dining_table.glb', tag:'dset', ids:['WoodenTable_01'], x:0, z:0, h:.76 }));
+    for(const [x, z, r] of [[-.65, -.85, 0],[.65, -.85, 0],[-.65, .85, Math.PI],[.65, .85, Math.PI],[-1.55, 0, Math.PI / 2],[1.55, 0, -Math.PI / 2]]) slot([F.box(x, .23, z, .45, .46, .45, wd), F.box(x - Math.sin(r) * .2, .7, z - Math.cos(r) * .2, r % Math.PI ? .06 : .45, .5, r % Math.PI ? .45 : .06, wd, deco)], F.spot({ skipIfTag:'dset', ids:['GreenChair_01','SchoolChair_01'], x, z, rot:r, h:1.0 }));
     slot([F.box(0, .45, -D / 2 + .28, 1.6, .9, .5, wd)], F.spot({ ids:['ClassicConsole_01','GothicCommode_01'], x:0, z:-D / 2, back:[0, 1], h:.95 }));
-    slot([], F.spot({ prop:true, x:-.5, z:0, y:.76, rot:.4 })); slot([], F.spot({ prop:true, x:.5, z:.05, y:.76, rot:-.7 }));
+    slot([], F.spot({ prop:true, x:-.22, z:0, y:.76, rot:.4 })); slot([], F.spot({ prop:true, x:.22, z:.05, y:.76, rot:-.7 }));
     slot([], F.spot({ ids:['Chandelier_01','Chandelier_03'], x:0, z:0, hang:true, h:.85 })); { const [X, Z] = F.pt(0, 0); lamp(X, h - .95, Z, T.light, 12); }
     plant(F, slot, W / 2 - .55, D / 2 - .55); plant(F, slot, -W / 2 + .55, D / 2 - .55);
   },
@@ -618,10 +628,10 @@ const ROOMS = {
     F.box(0, .73, -D / 2 + .42, 1.7, .05, .78, wd); F.box(-.62, .35, -D / 2 + .42, .42, .7, .7, wd); F.box(.8, .35, -D / 2 + .42, .06, .7, .7, wd, deco);
     for(const y of [.55, .33, .11]) F.box(-.62, y, -D / 2 + .775, .36, .18, .02, std(shade(T.fc, .65)), deco);
     F.box(.15, 1.06, -D / 2 + .22, .66, .4, .03, std('#141518', { roughness:.3 }), deco); F.box(.15, .82, -D / 2 + .22, .06, .14, .05, std('#2b2b2b'), deco); F.box(.15, .765, -D / 2 + .5, .44, .02, .15, std('#2b2b2b'), deco);
-    slot([], F.spot({ ids:['Lantern_01'], x:-.6, z:-D / 2 + .35, y:.755, rot:.6, h:.3 })); { const [X, Z] = F.pt(-.6, -D / 2 + .4); lamp(X, 1.15, Z, T.light, 4); }
+    slot([], F.spot({ st:'desk_lamp.glb', ids:['Lantern_01'], x:-.6, z:-D / 2 + .35, y:.755, rot:.6, h:.3 })); slot([], F.spot({ st:'golden_globe_decoration.glb', x:.68, z:-D / 2 + .3, y:.755, rot:-.4 })); { const [X, Z] = F.pt(-.6, -D / 2 + .4); lamp(X, 1.15, Z, T.light, 4); }
     slot([F.box(.1, .24, -D / 2 + 1.2, .48, .48, .48, std('#333')), F.box(.1, .75, -D / 2 + 1.42, .46, .55, .06, std('#333'), deco)], F.spot({ ids:['GreenChair_01','SchoolChair_01'], x:.1, z:-D / 2 + 1.2, rot:Math.PI, h:1.0 }));
     slot([F.box(-W / 2 + .16, 1.05, .2, .3, 2.1, Math.min(3, D - 2.4), wd)], F.spot({ ids:['Shelf_01'], x:-W / 2, z:.2, back:[1, 0], rot:Math.PI / 2, h:2.08, span:Math.min(3, D - 2.4) }));
-    slot([F.box(W / 2 - .9, .25, D / 2 - 1.1, .8, .5, .8, std('#7a5c46', { roughness:.95 }))], F.spot({ ids:['ArmChair_01'], x:W / 2 - .9, z:D / 2 - 1.1, rot:-Math.PI * .75, h:1.05 }));
+    slot([F.box(W / 2 - .9, .25, D / 2 - 1.1, .8, .5, .8, std('#7a5c46', { roughness:.95 }))], F.spot({ st:'old_leather_armchair.glb', ids:['ArmChair_01'], x:W / 2 - .9, z:D / 2 - 1.1, rot:-Math.PI * .75, h:1.05 }));
     plant(F, slot, W / 2 - .5, -D / 2 + .5); floorLamp(F, lamp, W / 2 - .45, D / 2 - .45, T.light); { const [X, Z] = F.pt(0, 0); lamp(X, h - .5, Z, T.light, 9); }
   },
   bathroom(F, slot, lamp, T){
@@ -629,9 +639,9 @@ const ROOMS = {
     const tx = Math.min(W / 2 - 1.0, 1.2);
     F.box(-tx, .28, -D / 2 + .42, 1.75, .56, .8, white); F.box(-tx, .5, -D / 2 + .42, 1.55, .02, .6, std('#bfe3ee', { roughness:.1 }), deco); F.cyl(-tx + .7, .75, -D / 2 + .1, .02, .4, steel);
     const vx = Math.min(W / 2 - .7, tx + 1.9);
-    F.box(vx, .42, -D / 2 + .28, .9, .84, .5, std(mix(T.wall, '#3c5560', .6))); F.box(vx, .86, -D / 2 + .28, .96, .04, .54, white, deco); F.cyl(vx, .9, -D / 2 + .3, .17, .06, white, 24, .2); F.cyl(vx, .98, -D / 2 + .1, .015, .2, steel);
+    slot([F.box(vx, .42, -D / 2 + .28, .9, .84, .5, std(mix(T.wall, '#3c5560', .6))), F.box(vx, .86, -D / 2 + .28, .96, .04, .54, white, deco), F.cyl(vx, .9, -D / 2 + .3, .17, .06, white, 24, .2), F.cyl(vx, .98, -D / 2 + .1, .015, .2, steel)], F.spot({ st:'washbasin.glb', x:vx, z:-D / 2, back:[0, 1] }));
     F.box(vx, 1.6, -D / 2 + .03, .8, .9, .03, std('#dfeaf0', { roughness:.05, metalness:.4 }), deco); F.box(vx, 1.6, -D / 2 + .02, .88, .98, .02, steel, deco);
-    F.cyl(W / 2 - .45, .2, .6, .2, .4, white, 20, .24); F.box(W / 2 - .16, .55, .6, .2, .5, .42, white); F.box(W / 2 - .45, .42, .6, .46, .04, .4, white, deco);
+    slot([F.cyl(W / 2 - .45, .2, .6, .2, .4, white, 20, .24), F.box(W / 2 - .16, .55, .6, .2, .5, .42, white), F.box(W / 2 - .45, .42, .6, .46, .04, .4, white, deco)], F.spot({ st:'toilet.glb', x:W / 2, z:.6, back:[-1, 0], rot:-Math.PI / 2 }));
     F.box(-W / 2 + .05, 1.25, .5, .04, .04, .8, steel, deco); F.box(-W / 2 + .07, .95, .5, .03, .6, .6, std('#8fb3b0', { roughness:.95 }), deco);
     rug(F, -tx, .45, 1.2, .7, '#8fb3b0', '#f2f2ee'); plant(F, slot, -W / 2 + .5, D / 2 - .5);
     { const [X, Z] = F.pt(0, 0); lamp(X, h - .4, Z, T.light, 11); const [X2, Z2] = F.pt(vx, -D / 2 + .5); lamp(X2, 2.1, Z2, T.light, 4); }
@@ -671,7 +681,7 @@ function kitchen(room, slot, lamp){
   splash(R0, R1); uppers(R0, sx - .5); uppers(sx + .5, R1);
   { const pane = new THREE.Mesh(new THREE.PlaneGeometry(.84, .62), new THREE.MeshBasicMaterial({ color:'#cfe6f2' })); pane.position.set(sx, 1.87, -hd + .012); roomGroup.add(pane);
     for(const [x, y, ww, hh] of [[sx, 2.2, .96, .06],[sx, 1.54, .96, .06],[sx - .45, 1.87, .06, .72],[sx + .45, 1.87, .06, .72],[sx, 1.87, .03, .62]]) addBox(x, y, -hd + .03, ww, hh, .04, white, deco); }
-  const pr = Math.min(.75, halfR - .2); prop(sx - pr, -hd + .3, .4); prop(sx + pr, -hd + .32, -.6);
+  const pr = Math.min(.75, halfR - .2); prop(sx - pr, -hd + .3, .4); slot([], { st:'microwave_oven.glb', prop:true, x:sx + pr, z:-hd + .33, y:TOP, rot:0 });
 
   /* left run: stove under a hood */
   const L0 = -hw + .05, L1 = -1.0, stx = (L0 + L1) / 2, halfL = (L1 - L0) / 2;
@@ -679,15 +689,14 @@ function kitchen(room, slot, lamp){
   const st = [addBox(stx, .45, -hd + .3, .6, .9, .6, white), addBox(stx, .42, -hd + .605, .5, .44, .02, dark, deco), addBox(stx, .7, -hd + .64, .46, .025, .025, grip, deco), addBox(stx, .93, -hd + .3, .6, .03, .6, dark, { collide:false }), addBox(stx, 1.0, -hd + .03, .6, .12, .03, white, deco)];
   for(const [dx, dz] of [[-.15, -.13],[.15, -.13],[-.15, .15],[.15, .15]]) st.push(cyl(stx + dx, TOP + .003, -hd + .3 + dz, .085, .008, std('#3a3d42'), 20));
   for(const dx of [-.21, -.07, .07, .21]){ const k = cyl(stx + dx, .82, -hd + .615, .022, .03, grip); k.rotation.x = Math.PI / 2; st.push(k); }
-  slot(st, { cat:['electronics & appliances/home appliances'], legacy:['appliances'], kw:['stove','oven','cooker','range'], not:['barrel','wood','camp'], x:stx, z:-hd, back:[0, 1], rot:0, h:.93 });
+  slot(st, { st:'old_gas_stove_and_oven.glb', cat:['electronics & appliances/home appliances'], legacy:['appliances'], kw:['stove','oven','cooker','range'], not:['barrel','wood','camp'], x:stx, z:-hd, back:[0, 1], rot:0, h:.93 });
   { const hood = new THREE.Mesh(new THREE.CylinderGeometry(.17, .47, .3, 4, 1), steel); hood.rotation.y = Math.PI / 4; hood.position.set(stx, 1.72, -hd + .31); roomGroup.add(hood); addBox(stx, (1.87 + h) / 2, -hd + .2, .26, h - 1.87, .26, steel, deco); }
   splash(L0, L1); uppers(L0, stx - .5); uppers(stx + .5, L1);
-  const pl = Math.min(.8, halfL - .2); prop(stx - pl, -hd + .3, -.3); prop(stx + pl, -hd + .32, .7);
+  const pl = Math.min(.8, halfL - .2); slot([], { st:'cute_toaster.glb', prop:true, x:stx - pl, z:-hd + .32, y:TOP, rot:.25 }); prop(stx + pl, -hd + .32, .7);
 
   /* fridge on the east wall, facing into the room */
   const fz = hd - 1.4, fx = hw - .38;
-  addBox(fx, .975, fz, .72, 1.95, .8, steel); addBox(fx - .362, .78, fz, .012, .018, .8, dark, deco);
-  addBox(fx - .385, 1.3, fz - .32, .03, .55, .03, grip, deco); addBox(fx - .385, .48, fz - .32, .03, .34, .03, grip, deco); addBox(fx, .03, fz, .7, .06, .78, dark, deco);
+  slot([addBox(fx, .975, fz, .72, 1.95, .8, steel), addBox(fx - .362, .78, fz, .012, .018, .8, dark, deco), addBox(fx - .385, 1.3, fz - .32, .03, .55, .03, grip, deco), addBox(fx - .385, .48, fz - .32, .03, .34, .03, grip, deco), addBox(fx, .03, fz, .7, .06, .78, dark, deco)], { st:'soviet_fridge_zil_moskva.glb', x:hw, z:fz, back:[-1, 0], rot:-Math.PI / 2 });
 
   /* island with stools and two pendant lights */
   addBox(0, .45, 0, 1.6, .9, .8, paint); for(const dx of [-.4, .4]) addBox(dx, .47, .405, .74, .78, .02, door, deco); addBox(0, TOP - .0225, 0, 2, .045, 1.05, top, { collide:false });
@@ -728,16 +737,19 @@ function resolveSlot(sl, used){
 }
 async function upgradeFurniture(room, token){
   if(P.realFurniture === false || !slots.length) return;
-  await libLoad(); if(!lib.all || token !== buildToken) return;
-  let told = false; const used = new Set();
+  await stLoad(); await libLoad(); if(token !== buildToken || (!lib.all && !st.list.length)) return;
+  let told = false; const used = new Set(), tags = new Set(); const tell = () => { if(!told){ told = true; toast('Fetching real furniture. The first visit to a room takes a little while.', 5000); } };
+  const hide = sl => { for(const m of sl.meshes){ m.visible = false; const k = pickables.indexOf(m); if(k >= 0) pickables.splice(k, 1); } };
   for(const sl of slots){
+    if(sl.skipIfTag && tags.has(sl.skipIfTag)){ hide(sl); continue; }
     let proto = null;
-    for(const id of resolveSlot(sl, used)){
-      if(!told && !phCache.has(id) && !(await fileGet('ph_' + id))){ told = true; toast('Fetching real furniture. The first visit to a room takes a little while.', 5000); }
+    if(sl.st && st.by[sl.st]){ if(!stCache.has(sl.st) && !(await fileGet('st_' + sl.st))) tell(); try{ proto = await stProto(st.by[sl.st]); if(sl.tag) tags.add(sl.tag); }catch(e){ console.warn('starter', sl.st, e); } }
+    if(!proto && lib.all) for(const id of resolveSlot(sl, used)){
+      if(!phCache.has(id) && !(await fileGet('ph_' + id))) tell();
       try{ proto = await phProto(id); break; }catch(e){ console.warn('furniture', id, e); }
     }
     if(token !== buildToken) return; if(!proto) continue;
-    const { g, sz } = proto; let s = sl.prop ? 1 : sl.h / sz.y; if(s < .6 || s > 1.6) s = 1;
+    const { g, sz } = proto; let s = (proto.fixed || sl.prop) ? 1 : sl.h / sz.y; if(s < .6 || s > 1.6) s = 1;
     const n = sl.span ? Math.max(1, Math.floor(sl.span / (sz.x * s + .03))) : 1, step = sz.x * s + .03;
     for(let i = 0; i < n; i++){
       const c = g.clone(true); c.scale.setScalar(s); c.rotation.y = sl.rot || 0;
@@ -746,7 +758,7 @@ async function upgradeFurniture(room, token){
       c.position.set(x, sl.hang ? room.h - sz.y * s : (sl.y || 0), z); roomGroup.add(c); c.updateMatrixWorld(true);
       if(!sl.hang) c.traverse(m => { if(m.isMesh) pickables.push(m); });
     }
-    for(const m of sl.meshes){ m.visible = false; const k = pickables.indexOf(m); if(k >= 0) pickables.splice(k, 1); }
+    hide(sl);
   }
 }
 
@@ -846,15 +858,28 @@ async function parseAny(buf){
   }
   return new GLTFLoader().parseAsync(buf.slice(0), '');
 }
+/* ---------- starter set: models bundled with the site, each with its facing and size already worked out ---------- */
+const st = { list:null, by:{}, loading:null };
+async function stLoad(){ if(st.list) return; if(!st.loading) st.loading = fetch('models/index.json').then(r => r.ok ? r.json() : []).then(j => { st.list = Array.isArray(j) ? j : []; for(const e of st.list) st.by[e.file] = e; }).catch(() => { st.list = []; }); await st.loading; }
+async function stBuf(file){ let b = await fileGet('st_' + file); if(!b){ const r = await fetch('models/' + file); if(!r.ok) throw new Error('model ' + r.status); b = await r.arrayBuffer(); await filePut('st_' + file, b); } return b; }
+function fitted(scene, fit){
+  const piv = new THREE.Group(); piv.add(scene); piv.rotation.y = (fit.yaw || 0) * Math.PI / 180; piv.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(piv), sz = box.getSize(new THREE.Vector3()), k = fit.h / Math.max(sz.y, 1e-5);
+  piv.position.set(-(box.min.x + sz.x / 2), -box.min.y, -(box.min.z + sz.z / 2)); const sc = new THREE.Group(); sc.scale.setScalar(k); sc.add(piv); const g = new THREE.Group(); g.add(sc);
+  return { g, sz:sz.multiplyScalar(k), fixed:true };
+}
+const stCache = new Map();
+async function stProto(e){ if(stCache.has(e.file)) return stCache.get(e.file); const job = (async () => fitted((await parseAny(await stBuf(e.file))).scene, e))(); stCache.set(e.file, job); job.catch(() => stCache.delete(e.file)); return job; }
 async function glbModel(o){
   let src = gltfCache.get(o.fileId);
   if(!src){
     const buf = await fileGet(o.fileId); if(!buf) return null;
-    const gl = await parseAny(buf);
-    const box = new THREE.Box3().setFromObject(gl.scene), sz = box.getSize(new THREE.Vector3()), big = Math.max(sz.x, sz.y, sz.z, 1e-4);
-    const k = (o.real && big > .08 && big < 2.6) ? 1 : .6 / big;
-    const wrap = new THREE.Group(); gl.scene.position.set(-(box.min.x + sz.x / 2) * k, -box.min.y * k, -(box.min.z + sz.z / 2) * k); gl.scene.scale.setScalar(k); wrap.add(gl.scene);
-    wrap.userData.h = sz.y * k; src = wrap; gltfCache.set(o.fileId, src);
+    const gl = await parseAny(buf); let wrap, hh;
+    if(o.fit){ const pr = fitted(gl.scene, o.fit); wrap = pr.g; hh = pr.sz.y; }
+    else { const box = new THREE.Box3().setFromObject(gl.scene), sz = box.getSize(new THREE.Vector3()), big = Math.max(sz.x, sz.y, sz.z, 1e-4);
+      const k = (o.real && big > .08 && big < 2.6) ? 1 : .6 / big;
+      wrap = new THREE.Group(); gl.scene.position.set(-(box.min.x + sz.x / 2) * k, -box.min.y * k, -(box.min.z + sz.z / 2) * k); gl.scene.scale.setScalar(k); wrap.add(gl.scene); hh = sz.y * k; }
+    wrap.userData.h = hh; src = wrap; gltfCache.set(o.fileId, src);
   }
   const g = src.clone(true); g.userData.labelY = src.userData.h + .12; return g;
 }
@@ -1193,6 +1218,7 @@ $('rTurn').onclick = () => { cur.splat.turn = ((cur.splat.turn || 0) + 1) % 4; a
 $('rScale').oninput = e => { cur.splat.scale = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rY').oninput = e => { cur.splat.y = +e.target.value; applySplatXf(cur); save(); renderRoomPanel(); };
 $('rAdd').onclick = openRoomModal;
+$('pCredits').onclick = async () => { await stLoad(); const el = $('credList'); el.innerHTML = ''; for(const e of st.list){ const d = document.createElement('div'); const a = document.createElement('a'); a.href = e.source; a.target = '_blank'; a.rel = 'noopener'; a.textContent = e.title; const l = document.createElement('a'); l.href = e.licenseUrl; l.target = '_blank'; l.rel = 'noopener'; l.textContent = e.license; d.append(a, ' by ' + e.by + ', ', l); el.appendChild(d); } if(!st.list.length) el.textContent = 'No bundled models on this copy of the app.'; openModal('credModal'); };
 $('rRebuild').onclick = () => { const t = $('rDesc').value.trim(); if(!t){ toast('Type a description first, such as: bright modern bedroom.'); return; } const pr = parseRoomText(t); cur.desc = t; cur.theme = pr.theme; cur.style = pr.style; save(); toast((pr.known ? 'Rebuilt as: ' : 'Type not recognised, built a living room: ') + pr.summary, 4500); enterRoom(cur, { pos:pos.clone(), yaw, pitch }); };
 $('rReal').onclick = () => { P.realFurniture = P.realFurniture === false; save(); renderRoomPanel(); const at = { pos:pos.clone(), yaw, pitch }; enterRoom(cur, at); };
 let armed = null; function resetArm(){ armed = null; $('rDelete').textContent = 'Delete room'; $('pReset').textContent = 'Start over with the example'; }
@@ -1210,7 +1236,7 @@ document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = closeModal);
 $('modalWrap').addEventListener('pointerdown', e => { if(e.target === $('modalWrap')) closeModal(); });
 
 /* online library (Poly Haven). Works where the page is allowed to reach other sites. */
-const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, mine:null, loading:false, dead:false };
+const PH = 'https://api.polyhaven.com', lib = { all:null, pick:null, mine:null, stPick:null, loading:false, dead:false };
 async function libLoad(){
   if(lib.all || lib.loading || lib.dead) return; lib.loading = true; $('libMsg').textContent = 'Loading the library…';
   try{ const r = await fetch(PH + '/assets?t=models'); if(!r.ok) throw new Error(r.status); const all = await r.json(); lib.all = {}; for(const [id, a] of Object.entries(all)) if(a.type === undefined || a.type === 2) lib.all[id] = a; $('libMsg').textContent = ''; }
@@ -1226,7 +1252,7 @@ function libRender(){
     const b = document.createElement('button'); b.type = 'button'; if(id === lib.pick) b.classList.add('on');
     const im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = a.thumbnail_url || `https://cdn.polyhaven.com/asset_img/thumbs/${id}.png?width=128&height=128`;
     const t = document.createElement('span'); t.textContent = a.name; b.append(im, t);
-    b.onclick = () => { lib.pick = lib.pick === id ? null : id; lib.mine = null; mineRender(); libRender(); $('libMsg').textContent = lib.pick ? `Picked: ${a.name}` : ''; }; g.appendChild(b);
+    b.onclick = () => { lib.pick = lib.pick === id ? null : id; lib.mine = null; lib.stPick = null; stRender(); mineRender(); libRender(); $('libMsg').textContent = lib.pick ? `Picked: ${a.name}` : ''; }; g.appendChild(b);
   }
   if(!items.length) $('libMsg').textContent = 'No free model matches. Try a simpler word.'; else if(!lib.pick) $('libMsg').textContent = '';
 }
@@ -1251,6 +1277,13 @@ async function thumbOf(m){
   thumbR.render(sc, cam); const url = thumbR.domElement.toDataURL('image/png'); await filePut('th_' + m.id, url);
   gl.scene.traverse(o => { if(o.geometry) o.geometry.dispose(); }); return url;
 }
+function stRender(){
+  const g = $('stGrid'); if(!g) return; g.innerHTML = ''; if(!st.list || !st.list.length) return;
+  const q = ($('libQ').value.trim() || $('oDesc').value.trim()).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+  const items = st.list.filter(e => !q.length || q.some(w => (e.name + ' ' + e.title).toLowerCase().includes(w)));
+  for(const e of (items.length ? items : st.list)){ const b = document.createElement('button'); b.type = 'button'; if(lib.stPick === e.file) b.classList.add('on'); const im = document.createElement('img'); im.loading = 'lazy'; im.alt = ''; im.src = 'models/' + e.thumb; const t = document.createElement('span'); t.textContent = e.name; b.append(im, t); b.title = `${e.title} by ${e.by}, ${e.license}`;
+    b.onclick = () => { lib.stPick = lib.stPick === e.file ? null : e.file; lib.pick = null; lib.mine = null; stRender(); libRender(); mineRender(); $('libMsg').textContent = lib.stPick ? `Picked: ${e.name}, by ${e.by}` : ''; }; g.appendChild(b); }
+}
 function mineRender(){
   const g = $('mineGrid'); if(!g) return; g.innerHTML = ''; const all = P.models || [];
   const q = ($('libQ').value.trim()).toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 1);
@@ -1259,7 +1292,7 @@ function mineRender(){
     const b = document.createElement('button'); b.type = 'button'; if(m.id === lib.mine) b.classList.add('on');
     const im = document.createElement('img'); im.alt = ''; const t = document.createElement('span'); t.textContent = m.name; b.append(im, t);
     thumbOf(m).then(u => { if(u) im.src = u; }).catch(() => {});
-    b.onclick = () => { lib.mine = lib.mine === m.id ? null : m.id; lib.pick = null; libRender(); mineRender(); }; g.appendChild(b);
+    b.onclick = () => { lib.mine = lib.mine === m.id ? null : m.id; lib.pick = null; lib.stPick = null; stRender(); libRender(); mineRender(); }; g.appendChild(b);
   }
   $('mineMsg').textContent = all.length ? `${all.length} on your shelf${items.length < all.length ? ', showing ' + items.length + '. Type above to search them.' : '.'} Drop more .glb files or .zip packs anywhere on the page.` : 'Download .glb models from any site, or a whole .zip pack, and drop them anywhere on this page. They stay on your shelf to reuse.';
 }
@@ -1292,13 +1325,14 @@ window.addEventListener('dragleave', () => { dragN = Math.max(0, dragN - 1); if(
 window.addEventListener('dragover', e => e.preventDefault());
 window.addEventListener('drop', e => { e.preventDefault(); dragN = 0; $('drop').classList.remove('show'); if(e.dataTransfer && e.dataTransfer.files.length) importFiles([...e.dataTransfer.files]); });
 
-let libT = 0; $('libQ').addEventListener('input', () => { clearTimeout(libT); libT = setTimeout(() => { libRender(); mineRender(); }, 150); });
-$('bAddObj').onclick = () => { $('oDesc').value = ''; $('oNote').value = ''; $('oFile').value = ''; $('libQ').value = ''; lib.pick = null; lib.mine = null; openModal('objModal'); $('oDesc').focus(); libLoad().then(libRender); libRender(); mineRender(); };
+let libT = 0; $('libQ').addEventListener('input', () => { clearTimeout(libT); libT = setTimeout(() => { libRender(); mineRender(); stRender(); }, 150); });
+$('bAddObj').onclick = () => { $('oDesc').value = ''; $('oNote').value = ''; $('oFile').value = ''; $('libQ').value = ''; lib.pick = null; lib.mine = null; lib.stPick = null; openModal('objModal'); $('oDesc').focus(); libLoad().then(libRender); libRender(); mineRender(); stLoad().then(stRender); stRender(); };
 $('oDesc').addEventListener('input', () => { if(!$('libQ').value){ clearTimeout(libT); libT = setTimeout(libRender, 250); } });
 $('oCreate').onclick = async () => {
-  const f = $('oFile').files[0]; const desc = $('oDesc').value.trim() || (f ? f.name.replace(/\.[^.]+$/, '') : '') || (lib.mine ? ((P.models || []).find(x => x.id === lib.mine) || {}).name || '' : '') || (lib.pick && lib.all ? lib.all[lib.pick].name : ''); if(!desc){ $('oDesc').focus(); toast('Describe the object first.'); return; }
+  const f = $('oFile').files[0]; const desc = $('oDesc').value.trim() || (f ? f.name.replace(/\.[^.]+$/, '') : '') || (lib.stPick && st.by[lib.stPick] ? st.by[lib.stPick].name : '') || (lib.mine ? ((P.models || []).find(x => x.id === lib.mine) || {}).name || '' : '') || (lib.pick && lib.all ? lib.all[lib.pick].name : ''); if(!desc){ $('oDesc').focus(); toast('Describe the object first.'); return; }
   const o = { id:uid(), room:cur.id, desc, note:$('oNote').value.trim(), rotY:yaw, scale:1, wallN:null, pos:[0,0,0] };
   if(f){ o.fileId = uid(); await filePut(o.fileId, await f.arrayBuffer()); }
+  else if(lib.stPick && st.by[lib.stPick]){ const e = st.by[lib.stPick]; $('libMsg').textContent = 'Fetching the model…'; try{ await stBuf(e.file); o.fileId = 'st_' + e.file; o.fit = { yaw:e.yaw, h:e.h }; o.src = `${e.title} by ${e.by} (${e.license})`; }catch(err){ console.warn(err); $('libMsg').textContent = 'That model could not be fetched.'; return; } }
   else if(lib.mine){ const m = (P.models || []).find(x => x.id === lib.mine); if(m){ o.fileId = m.fileId; o.real = true; o.src = 'Your model: ' + m.name; } }
   else if(lib.pick){
     $('oCreate').disabled = true; $('libMsg').textContent = 'Fetching the model…';
