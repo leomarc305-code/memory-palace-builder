@@ -133,7 +133,7 @@ a{color:var(--brass)}
   </div>
 </div>
 
-<div id="hint" class="glass"><span id="hintText">Drag to look around. Walk with W A S D or the arrow keys. Click the floor to glide there. F punches what you are looking at, T pushes it.</span><button id="hintOk">Got it</button></div>
+<div id="hint" class="glass"><span id="hintText">Drag to look around. Walk with W A S D or the arrow keys. Click the floor to glide there. Keys I and K look up and down, J and L turn. F punches what is in front of you, T pushes it.</span><button id="hintOk">Got it</button></div>
 
 <div id="card" class="glass" aria-live="polite">
   <div class="head"><div class="num" id="cardNum">1</div><div id="cardDesc"></div><button id="cardClose" aria-label="Close">✕</button></div>
@@ -448,6 +448,7 @@ let colliderMeshes = null;      // from a room file's walls-and-floor file
 let splatRoot = null, spark = null, buildToken = 0;
 let slots = [];                 // furniture places that a real model can take over
 let dynProps = [];              // small furnishings that physics may move
+let glassList = [];             // window panes, mirrors and screens that crack when punched
 
 function doorPos(room, wall){
   const hw = room.w / 2, hd = room.d / 2;
@@ -525,7 +526,7 @@ function decorate(room, T){
     const sky = canvasTex(64, 128, (g, W, H) => { const gr = g.createLinearGradient(0, 0, 0, H); const c = new THREE.Color(T.sky || '#bfe0f5'); gr.addColorStop(0, '#' + c.clone().multiplyScalar(.85).getHexString()); gr.addColorStop(1, '#' + c.clone().lerp(new THREE.Color('#ffffff'), .45).getHexString()); g.fillStyle = gr; g.fillRect(0, 0, W, H); });
     for(const sgn of [-1, 1]){
       const c = p.clone().addScaledVector(tan, sgn * len / 4), g = new THREE.Group(); g.position.copy(c).addScaledVector(n, .012).setY(1.6); g.lookAt(g.position.clone().add(n)); roomGroup.add(g);
-      const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.3), new THREE.MeshBasicMaterial({ map:sky })); g.add(pane);
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.3), new THREE.MeshBasicMaterial({ map:sky })); g.add(pane); glassList.push(pane);
       for(const [x, y, ww, hh, dz] of [[0, .68, 1.26, .08, .03],[0, -.68, 1.26, .08, .03],[-.59, 0, .08, 1.44, .03],[.59, 0, .08, 1.44, .03],[0, 0, .035, 1.3, .02],[0, 0, 1.1, .035, .02],[0, -.75, 1.36, .05, .09]]){ const b = new THREE.Mesh(new THREE.BoxGeometry(ww, hh, dz * 2), trim); b.position.set(x, y, dz); g.add(b); }
       const l = new THREE.PointLight(T.sky ? '#8fa6c8' : '#eaf4ff', T.sky ? 2 : 5, 9, 1.8); l.position.copy(c).addScaledVector(n, .5).setY(1.7); roomGroup.add(l);
     }
@@ -597,7 +598,7 @@ const ROOMS = {
     const { W, D, h } = F, wd = std(shade(T.fc, .8)), fab = std('#7d8a86', { roughness:.95 }), deco = { collide:false, pick:false };
     rug(F, 0, .25, Math.min(3.4, W - 2.4), 2.4, '#8a2f2b', '#e3c88f');
     slot([F.box(0, .3, -D / 2 + .25, 1.5, .6, .45, wd)], F.spot({ ids:['ClassicConsole_01','WoodenTable_03'], x:0, z:-D / 2, back:[0, 1], h:.62 }));
-    slot([F.box(0, 1.0, -D / 2 + .25, 1.15, .66, .06, std('#141518', { roughness:.3 })), F.box(0, .64, -D / 2 + .25, .3, .06, .2, std('#141518'), deco)], F.spot({ st:'retro_television.glb', ids:['Television_01'], x:0, z:-D / 2 + .3, y:.62, h:.5 }));
+    slot([(m => { glassList.push(m); return m; })(F.box(0, 1.0, -D / 2 + .25, 1.15, .66, .06, std('#141518', { roughness:.3 }))), F.box(0, .64, -D / 2 + .25, .3, .06, .2, std('#141518'), deco)], F.spot({ st:'retro_television.glb', ids:['Television_01'], x:0, z:-D / 2 + .3, y:.62, h:.5 }));
     slot([], F.spot({ st:'antique_wall_clock.glb', x:0, z:-D / 2, back:[0, 1], y:1.85 }));
     slot([F.box(0, .22, 1.35, 2.0, .44, .85, fab), F.box(0, .62, 1.72, 2.0, .5, .2, fab, deco), F.box(-.92, .5, 1.35, .16, .26, .85, fab, deco), F.box(.92, .5, 1.35, .16, .26, .85, fab, deco)], F.spot({ st:'victorian_lounge_sofa.glb', ids:['Sofa_01'], x:0, z:1.4, rot:Math.PI, h:.8 }));
     slot([F.box(0, .36, .1, 1.2, .06, .65, wd), F.box(0, .17, .1, 1.0, .34, .5, wd, deco)], F.spot({ st:'victorian_coffee_table.glb', ids:['CoffeeTable_01','WoodenTable_01'], x:0, z:.1, h:.42 }));
@@ -633,7 +634,7 @@ const ROOMS = {
     rug(F, 0, 0, 2.8, 2.0, '#3d4c63', '#c9b58a');
     F.box(0, .73, -D / 2 + .42, 1.7, .05, .78, wd); F.box(-.62, .35, -D / 2 + .42, .42, .7, .7, wd); F.box(.8, .35, -D / 2 + .42, .06, .7, .7, wd, deco);
     for(const y of [.55, .33, .11]) F.box(-.62, y, -D / 2 + .775, .36, .18, .02, std(shade(T.fc, .65)), deco);
-    F.box(.15, 1.06, -D / 2 + .22, .66, .4, .03, std('#141518', { roughness:.3 }), deco); F.box(.15, .82, -D / 2 + .22, .06, .14, .05, std('#2b2b2b'), deco); F.box(.15, .765, -D / 2 + .5, .44, .02, .15, std('#2b2b2b'), deco);
+    glassList.push(F.box(.15, 1.06, -D / 2 + .22, .66, .4, .03, std('#141518', { roughness:.3 }), deco)); F.box(.15, .82, -D / 2 + .22, .06, .14, .05, std('#2b2b2b'), deco); F.box(.15, .765, -D / 2 + .5, .44, .02, .15, std('#2b2b2b'), deco);
     slot([], F.spot({ st:'desk_lamp.glb', ids:['Lantern_01'], x:-.6, z:-D / 2 + .35, y:.755, rot:.6, h:.3 })); slot([], F.spot({ st:'golden_globe_decoration.glb', x:.68, z:-D / 2 + .3, y:.755, rot:-.4 })); { const [X, Z] = F.pt(-.6, -D / 2 + .4); lamp(X, 1.15, Z, T.light, 4); }
     slot([F.box(.1, .24, -D / 2 + 1.2, .48, .48, .48, std('#333')), F.box(.1, .75, -D / 2 + 1.42, .46, .55, .06, std('#333'), deco)], F.spot({ ids:['GreenChair_01','SchoolChair_01'], x:.1, z:-D / 2 + 1.2, rot:Math.PI, h:1.0 }));
     slot([F.box(-W / 2 + .16, 1.05, .2, .3, 2.1, Math.min(3, D - 2.4), wd)], F.spot({ ids:['Shelf_01'], x:-W / 2, z:.2, back:[1, 0], rot:Math.PI / 2, h:2.08, span:Math.min(3, D - 2.4) }));
@@ -646,7 +647,7 @@ const ROOMS = {
     F.box(-tx, .28, -D / 2 + .42, 1.75, .56, .8, white); F.box(-tx, .5, -D / 2 + .42, 1.55, .02, .6, std('#bfe3ee', { roughness:.1 }), deco); F.cyl(-tx + .7, .75, -D / 2 + .1, .02, .4, steel);
     const vx = Math.min(W / 2 - .7, tx + 1.9);
     slot([F.box(vx, .42, -D / 2 + .28, .9, .84, .5, std(mix(T.wall, '#3c5560', .6))), F.box(vx, .86, -D / 2 + .28, .96, .04, .54, white, deco), F.cyl(vx, .9, -D / 2 + .3, .17, .06, white, 24, .2), F.cyl(vx, .98, -D / 2 + .1, .015, .2, steel)], F.spot({ st:'washbasin.glb', x:vx, z:-D / 2, back:[0, 1] }));
-    F.box(vx, 1.6, -D / 2 + .03, .8, .9, .03, std('#dfeaf0', { roughness:.05, metalness:.4 }), deco); F.box(vx, 1.6, -D / 2 + .02, .88, .98, .02, steel, deco);
+    glassList.push(F.box(vx, 1.6, -D / 2 + .03, .8, .9, .03, std('#dfeaf0', { roughness:.05, metalness:.4 }), deco)); F.box(vx, 1.6, -D / 2 + .02, .88, .98, .02, steel, deco);
     slot([F.cyl(W / 2 - .45, .2, .6, .2, .4, white, 20, .24), F.box(W / 2 - .16, .55, .6, .2, .5, .42, white), F.box(W / 2 - .45, .42, .6, .46, .04, .4, white, deco)], F.spot({ st:'toilet.glb', x:W / 2, z:.6, back:[-1, 0], rot:-Math.PI / 2 }));
     F.box(-W / 2 + .05, 1.25, .5, .04, .04, .8, steel, deco); F.box(-W / 2 + .07, .95, .5, .03, .6, .6, std('#8fb3b0', { roughness:.95 }), deco);
     rug(F, -tx, .45, 1.2, .7, '#8fb3b0', '#f2f2ee'); plant(F, slot, -W / 2 + .5, D / 2 - .5);
@@ -685,7 +686,7 @@ function kitchen(room, slot, lamp){
   cyl(sx, TOP + .14, -hd + .09, .018, .28, steel); const sp = new THREE.Mesh(new THREE.TorusGeometry(.09, .015, 8, 16, Math.PI), steel); sp.rotation.y = Math.PI / 2; sp.position.set(sx, TOP + .28, -hd + .18); roomGroup.add(sp);
   for(const dx of [-.1, .1]) cyl(sx + dx, TOP + .03, -hd + .09, .02, .06, grip);
   splash(R0, R1); uppers(R0, sx - .5); uppers(sx + .5, R1);
-  { const pane = new THREE.Mesh(new THREE.PlaneGeometry(.84, .62), new THREE.MeshBasicMaterial({ color:'#cfe6f2' })); pane.position.set(sx, 1.87, -hd + .012); roomGroup.add(pane);
+  { const pane = new THREE.Mesh(new THREE.PlaneGeometry(.84, .62), new THREE.MeshBasicMaterial({ color:'#cfe6f2' })); pane.position.set(sx, 1.87, -hd + .012); roomGroup.add(pane); glassList.push(pane);
     for(const [x, y, ww, hh] of [[sx, 2.2, .96, .06],[sx, 1.54, .96, .06],[sx - .45, 1.87, .06, .72],[sx + .45, 1.87, .06, .72],[sx, 1.87, .03, .62]]) addBox(x, y, -hd + .03, ww, hh, .04, white, deco); }
   const pr = Math.min(.75, halfR - .2); prop(sx - pr, -hd + .3, .4); slot([], { st:'microwave_oven.glb', prop:true, x:sx + pr, z:-hd + .33, y:TOP, rot:0 });
 
@@ -799,7 +800,7 @@ async function buildRoom(room){
   const token = ++buildToken;
   disposeGroup(roomGroup); disposeGroup(fxGroup);
   if(splatRoot){ scene.remove(splatRoot); splatRoot.traverse(o => o.dispose && o.dispose()); splatRoot = null; }
-  pickables = []; colliders = []; doorHits = []; slots = []; dynProps = []; colliderMeshes = null; cur = room;
+  pickables = []; colliders = []; doorHits = []; slots = []; dynProps = []; glassList = []; colliderMeshes = null; cur = room;
   const { w, d, h } = room, T = lookOf(room), isSplat = !!room.splat;
   roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55 * (T.dim || 1)));
   const hide = isSplat ? { transparent:true, opacity:0, depthWrite:false } : {};
@@ -973,7 +974,8 @@ function frame(now){
     let f = 0, s = 0, turn = 0;
     if(keys.has('w') || keys.has('arrowup')) f += 1; if(keys.has('s') || keys.has('arrowdown')) f -= 1;
     if(keys.has('d')) s += 1; if(keys.has('a')) s -= 1;
-    if(keys.has('arrowleft') || keys.has('q')) turn += 1; if(keys.has('arrowright') || keys.has('e')) turn -= 1;
+    if(keys.has('arrowleft') || keys.has('q') || keys.has('j')) turn += 1; if(keys.has('arrowright') || keys.has('e') || keys.has('l')) turn -= 1;
+    let tilt = 0; if(keys.has('i') || keys.has('pageup')) tilt += 1; if(keys.has('k') || keys.has('pagedown')) tilt -= 1; if(tilt) pitch = Math.max(-1.25, Math.min(1.25, pitch + tilt * 1.5 * dt));
     if(joy.on){ f += -joy.y; s += joy.x; }
     yaw += turn * 1.9 * dt;
     if(f || s){
@@ -1015,7 +1017,46 @@ hands.add(new THREE.PointLight('#fff1dc', .35, 2));
 let nextFist = 0;
 function meshBox(root){ const b = new THREE.Box3(); root.updateMatrixWorld(true); root.traverse(m => { if(m.isMesh && m.visible !== false && !m.userData.noPhys) b.expandByObject(m); }); return b; }
 let physT = 0; function physQueue(){ if(!phys.on) return; clearTimeout(physT); physT = setTimeout(physBuild, 350); }
-function physTidy(){ for(const it of phys.items){ it.node.position.copy(it.home.p); it.node.quaternion.copy(it.home.q); if(it.shadow) it.shadow.visible = true; } }
+function physTidy(){
+  for(const it of phys.items){ if(it.temp){ if(it.node.parent) it.node.parent.remove(it.node); it.node.geometry.dispose(); if(phys.world) phys.world.removeBody(it.body); continue; } it.node.position.copy(it.home.p); it.node.quaternion.copy(it.home.q); if(it.shadow) it.shadow.visible = true; }
+  phys.items = phys.items.filter(it => !it.temp);
+  for(const g of glassList){ const u = g.userData; for(const c of u.cracks || []){ if(c.parent) c.parent.remove(c); c.geometry.dispose(); c.material.map.dispose(); c.material.dispose(); } u.cracks = []; u.hits = 0; if(u.orig){ g.material = u.orig; u.orig = null; } }
+}
+function crackTex(seed, hole){
+  return canvasTex(256, 256, (g, W, H) => { let r = seed * 9301 + 49297; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+    g.clearRect(0, 0, W, H); const cx = W / 2, cy = H / 2, n = 9 + Math.floor(rnd() * 5), ang = []; for(let i = 0; i < n; i++) ang.push(i / n * 6.283 + rnd() * .5);
+    if(hole){ g.fillStyle = 'rgba(12,16,22,.92)'; g.beginPath(); ang.forEach((a, i) => { const rr = 34 + rnd() * 38; const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.fill(); }
+    g.lineCap = 'round';
+    for(const a of ang){ let x = cx, y = cy, d = a; g.beginPath(); g.moveTo(x, y); const steps = 5 + Math.floor(rnd() * 4); for(let k = 0; k < steps; k++){ d += (rnd() - .5) * .5; const len = 14 + rnd() * 16; x += Math.cos(d) * len; y += Math.sin(d) * len; g.lineTo(x, y); } g.strokeStyle = 'rgba(255,255,255,.95)'; g.lineWidth = 2.6; g.stroke(); g.strokeStyle = 'rgba(25,35,45,.8)'; g.lineWidth = 1.1; g.stroke(); }
+    for(let ring = 1; ring <= 3; ring++){ g.beginPath(); ang.forEach((a, i) => { const rr = ring * 22 + rnd() * 8; const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 1; g.stroke(); }
+  });
+}
+function hitGlass(g, point, power){
+  const u = g.userData; u.hits = (u.hits || 0) + (power === 'punch' ? 1 : .5); u.cracks = u.cracks || [];
+  g.updateMatrixWorld(true); const q = g.getWorldQuaternion(new THREE.Quaternion()), nrm = new THREE.Vector3(0, 0, 1).applyQuaternion(q), toCam = camera.getWorldPosition(new THREE.Vector3()).sub(point); if(nrm.dot(toCam) < 0) nrm.negate();
+  const box = new THREE.Box3().setFromObject(g), sz = box.getSize(new THREE.Vector3()), big = Math.max(sz.x, sz.y, sz.z), shattered = u.hits >= 3;
+  const s = shattered ? big * .9 : Math.min(big * .8, .35 + u.hits * .12), dec = new THREE.Mesh(new THREE.PlaneGeometry(s, s), new THREE.MeshBasicMaterial({ map:crackTex(Math.floor(point.x * 977 + point.y * 131 + u.hits * 7) & 1023, shattered), transparent:true, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-2 * (u.cracks.length + 1) }));
+  dec.quaternion.copy(q); if(nrm.dot(new THREE.Vector3(0, 0, 1).applyQuaternion(q)) < 0) dec.rotateY(Math.PI); dec.rotateZ(Math.random() * 6.28);
+  const pp = shattered ? box.getCenter(new THREE.Vector3()) : point.clone(); pp.addScaledVector(nrm, .012 + .003 * u.cracks.length + (g.geometry.type === 'PlaneGeometry' ? 0 : Math.min(sz.x, sz.y, sz.z) / 2)); if(!shattered){ const c = box.getCenter(new THREE.Vector3()), lim = big / 2 - s * .3; pp.x = THREE.MathUtils.clamp(pp.x, c.x - Math.max(lim, 0) - .001 - sz.x, c.x + Math.max(lim, 0) + .001 + sz.x); }
+  dec.position.copy(pp); dec.userData.noPhys = true; roomGroup.add(dec); u.cracks.push(dec);
+  if(shattered && phys.world && u.hits < 3.99){ u.hits = 4; const C = phys.C, c = box.getCenter(new THREE.Vector3());
+    for(let i = 0; i < 18; i++){ const a = .05 + Math.random() * .09, m = new THREE.Mesh(new THREE.BoxGeometry(a, a * (.6 + Math.random()), .008), new THREE.MeshStandardMaterial({ color:'#d6ecf5', roughness:.05, metalness:.3, transparent:true, opacity:.75 }));
+      const p = c.clone().add(new THREE.Vector3((Math.random() - .5) * sz.x, (Math.random() - .5) * sz.y, (Math.random() - .5) * sz.z)).addScaledVector(nrm, .06); m.position.copy(p); m.quaternion.copy(q); roomGroup.add(m);
+      const body = new C.Body({ mass:.05, shape:new C.Box(new C.Vec3(a / 2, a / 2, .006)), linearDamping:.05, angularDamping:.2 }); body.position.set(p.x, p.y, p.z); body.quaternion.set(q.x, q.y, q.z, q.w);
+      body.velocity.set(nrm.x * (1 + Math.random() * 2) + (Math.random() - .5), Math.random() * 1.5, nrm.z * (1 + Math.random() * 2) + (Math.random() - .5)); body.angularVelocity.set(Math.random() * 8 - 4, Math.random() * 8 - 4, Math.random() * 8 - 4); phys.world.addBody(body);
+      phys.items.push({ node:m, body, cl:new THREE.Vector3(), home:null, temp:true }); }
+  }
+}
+function pickTarget(){
+  const cp = camera.getWorldPosition(new THREE.Vector3()), dir = camera.getWorldDirection(new THREE.Vector3()), glass = glassList.filter(g => g.visible !== false && g.parent);
+  ray.camera = camera; ray.far = 2.4; ray.set(cp, dir); const hits = ray.intersectObjects(phys.items.filter(it => !it.temp).map(it => it.node).concat(glass), true); ray.far = Infinity;
+  for(const h of hits){ if(!h.object.isMesh || h.object.visible === false || h.object.userData.noPhys) continue; if(glassList.includes(h.object)) return { glass:h.object, point:h.point }; let n = h.object; while(n && !n.userData.physItem) n = n.parent; if(n) return { it:n.userData.physItem, point:h.point }; }
+  const hx = -Math.sin(yaw), hz = -Math.cos(yaw); let best = null, bs = 1e9;
+  const consider = (c, obj) => { const dx = c.x - cp.x, dz = c.z - cp.z, d = Math.hypot(dx, dz); if(d > 2.0 || c.y > cp.y + 1.0) return; const cos = d < .25 ? 1 : (dx * hx + dz * hz) / d; if(cos < (d < .7 ? .35 : .74)) return; const sc = d * (1.35 - cos); if(sc < bs){ bs = sc; best = { ...obj, point:c }; } };
+  for(const it of phys.items) if(!it.temp) consider(new THREE.Vector3(it.body.position.x, it.body.position.y, it.body.position.z), { it });
+  for(const g of glass) consider(new THREE.Box3().setFromObject(g).getCenter(new THREE.Vector3()), { glass:g });
+  return best;
+}
 function physBuild(){
   if(!phys.on || !phys.C || !cur) return; const C = phys.C; physTidy();
   const w = new C.World({ gravity:new C.Vec3(0, -9.82, 0) }); w.allowSleep = true; w.defaultContactMaterial.friction = .55; w.defaultContactMaterial.restitution = .12; phys.world = w; phys.items = [];
@@ -1044,23 +1085,24 @@ function physStep(dt){
   if(!phys.on || !phys.world) return; const pb = phys.player;
   pb.velocity.set((pos.x - phys.last.x) / dt, 0, (pos.z - phys.last.z) / dt); pb.position.set(pos.x, pos.y - .7, pos.z); phys.last.copy(pos);
   phys.world.step(1 / 60, dt, 3);
-  for(const it of phys.items){ const b = it.body; if(b.sleepState === 2 && !it.dirty) continue; it.dirty = b.sleepState !== 2;
+  for(const it of phys.items){ const b = it.body; if(it.temp){ it.node.position.set(b.position.x, b.position.y, b.position.z); it.node.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w); continue; } if(b.sleepState === 2 && !it.dirty) continue; it.dirty = b.sleepState !== 2;
     it.node.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w); const off = it.cl.clone().applyQuaternion(it.node.quaternion); it.node.position.set(b.position.x - off.x, b.position.y - off.y, b.position.z - off.z);
     if(it.shadow && it.shadow.visible) it.shadow.visible = false; }
 }
 function handsAnim(dt, now){
   if(!hands.visible) return;
-  fists.forEach((g, i) => { const u = g.userData; if(u.t < 1){ u.t = Math.min(1, u.t + dt / (u.power > 1 ? .26 : .5)); const k = Math.sin(u.t * Math.PI), reach = u.power > 1 ? .42 : .3; g.position.set(u.home.x * (1 - k * .75), u.home.y + k * .12, u.home.z - k * reach); }
+  fists.forEach((g, i) => { const u = g.userData; if(u.t < 1){ u.t = Math.min(1, u.t + dt / (u.power > 1 ? .26 : .5)); const k = Math.sin(u.t * Math.PI), reach = u.power > 1 ? .62 : .45, aim = u.aim || new THREE.Vector3(0, 0, -1); g.position.set(u.home.x * (1 - k * .8) + aim.x * reach * k, u.home.y * (1 - k * .7) + aim.y * reach * k, u.home.z * (1 - k * .5) + aim.z * reach * k); }
     else g.position.set(u.home.x, u.home.y + Math.sin(now / 900 + i) * .008, u.home.z); });
 }
 function strike(power){
-  if(!phys.on) return; const g = fists[nextFist]; nextFist = 1 - nextFist; g.userData.t = 0; g.userData.power = power === 'punch' ? 2 : 1;
+  if(!phys.on) return; const g = fists[nextFist]; nextFist = 1 - nextFist; const tg = pickTarget();
+  g.userData.t = 0; g.userData.power = power === 'punch' ? 2 : 1; g.userData.aim = tg ? camera.worldToLocal(tg.point.clone()).normalize() : new THREE.Vector3(0, 0, -1);
   setTimeout(() => {
-    if(!phys.world) return; const C = phys.C, dir = camera.getWorldDirection(new THREE.Vector3()); ray.camera = camera; ray.far = 3; ray.set(camera.getWorldPosition(new THREE.Vector3()), dir);
-    const hits = ray.intersectObjects(phys.items.map(it => it.node), true); ray.far = Infinity;
-    const hit = hits.find(h => h.object.isMesh && h.object.visible !== false && !h.object.userData.noPhys); if(!hit || hit.distance > 2.2) return;
-    let n = hit.object; while(n && !n.userData.physItem) n = n.parent; if(!n) return; const it = n.userData.physItem, m = it.body.mass, J = power === 'punch' ? Math.min(m * 7, 70) : Math.min(m * 1.8, 14);
-    it.body.wakeUp(); it.body.applyImpulse(new C.Vec3(dir.x * J, (dir.y + (power === 'punch' ? .3 : .08)) * J, dir.z * J), new C.Vec3(hit.point.x - it.body.position.x, hit.point.y - it.body.position.y, hit.point.z - it.body.position.z));
+    if(!phys.world || !tg) return; const C = phys.C;
+    if(tg.glass){ hitGlass(tg.glass, tg.point, power); return; }
+    const it = tg.it, bp = it.body.position, from = new THREE.Vector3(pos.x, pos.y - .35, pos.z), dir = new THREE.Vector3(bp.x - from.x, 0, bp.z - from.z); if(dir.lengthSq() < 1e-4) dir.set(-Math.sin(yaw), 0, -Math.cos(yaw)); dir.normalize();
+    const m = it.body.mass, J = power === 'punch' ? Math.min(m * 7, 70) : Math.min(m * 1.8, 14);
+    it.body.wakeUp(); it.body.applyImpulse(new C.Vec3(dir.x * J, (power === 'punch' ? .32 : .08) * J, dir.z * J), new C.Vec3(tg.point.x - bp.x, tg.point.y - bp.y, tg.point.z - bp.z));
   }, power === 'punch' ? 90 : 180);
 }
 async function handsToggle(quiet){
@@ -1068,7 +1110,7 @@ async function handsToggle(quiet){
   $('bHands').disabled = true;
   try{ if(!phys.C) phys.C = await import('cannon-es'); }catch(e){ console.warn(e); toast('The physics part could not load. Check your connection and try again.', 4500); $('bHands').disabled = false; return; }
   $('bHands').disabled = false; phys.on = true; if(quiet !== true){ P.hands = true; save(); } hands.visible = true; $('handBar').classList.add('show'); $('bHands').classList.add('on'); physBuild();
-  if(quiet !== true) toast(matchMedia('(pointer:coarse)').matches ? 'Look at something close and tap Punch or Push. Tidy up puts everything back.' : 'Look at something close. F punches, T pushes gently. Walking into things nudges them. Tidy up puts everything back.', 6500);
+  if(quiet !== true) toast(matchMedia('(pointer:coarse)').matches ? 'Look at something close and tap Punch or Push. Tidy up puts everything back.' : 'Stand in front of something. F punches, T pushes gently. I and K aim up and down, J and L turn. Tidy up puts everything back.', 6500);
 }
 $('bHands').onclick = () => handsToggle(); $('hPunch').onclick = () => strike('punch'); $('hPush').onclick = () => strike('push'); $('hTidy').onclick = () => { physBuild(); toast('Everything is back in place.'); };
 
@@ -1191,7 +1233,7 @@ window.addEventListener('keydown', e => {
   if(k === 'n' || k === ']') goLocus(curLocus + 1); if(k === 'p' || k === '[') goLocus(curLocus - 1);
   if(k === 'f') strike('punch'); if(k === 't') strike('push');
   if(k === 'm') togglePanel('mapPanel'); if(k === '/'){ e.preventDefault(); togglePanel('findPanel', true); }
-  if(k.startsWith('arrow') || k === ' ') e.preventDefault();
+  if(k.startsWith('arrow') || k === ' ' || k === 'pageup' || k === 'pagedown') e.preventDefault();
 });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => keys.clear());
