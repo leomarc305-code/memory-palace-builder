@@ -83,6 +83,8 @@ h2{font-size:20px}
 .libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px;max-height:232px;overflow:auto}
 .libgrid button{padding:4px;display:flex;flex-direction:column;gap:3px;align-items:center;white-space:normal;font-size:11px;line-height:1.15;text-align:center}
 .libgrid button.on{background:rgba(217,164,65,.2)}
+#handBar{position:fixed;right:10px;bottom:70px;display:none;gap:6px;padding:6px}
+#handBar.show{display:flex}
 #drop{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(8,5,4,.72);font-family:var(--display);font-size:28px;border:3px dashed var(--brass);pointer-events:none}
 #drop.show{display:flex}
 .libgrid img{width:100%;aspect-ratio:1;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.06)}
@@ -110,7 +112,8 @@ a{color:var(--brass)}
   "three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/",
   "@sparkjsdev/spark":"https://cdn.jsdelivr.net/npm/@sparkjsdev/spark@2.1.0/dist/spark.module.js",
-  "fflate":"https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js"
+  "fflate":"https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js",
+  "cannon-es":"https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
 }}
 </script>
 </head>
@@ -122,6 +125,7 @@ a{color:var(--brass)}
   <div id="rooms" class="glass" role="tablist" aria-label="Rooms"></div>
   <div id="tools" class="glass">
     <button id="bAddObj" class="primary">+ Object</button>
+    <button id="bHands" title="Hands: punch and push things">Hands</button>
     <button id="bMap">Map</button>
     <button id="bFind">Find</button>
     <button id="bViews">Views</button>
@@ -244,6 +248,7 @@ a{color:var(--brass)}
   </div>
 </div>
 
+<div id="handBar" class="glass"><button id="hPunch" class="primary">Punch</button><button id="hPush">Push</button><button id="hTidy">Tidy up</button></div>
 <div id="toast" class="glass" role="status"></div>
 <div id="drop">Drop to add to your models</div>
 <div id="stick"><i></i></div>
@@ -367,7 +372,7 @@ scene.background = new THREE.Color('#0d0a09');
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 200);
 camera.rotation.order = 'YXZ';
 const roomGroup = new THREE.Group(), objGroup = new THREE.Group(), fxGroup = new THREE.Group();
-scene.add(roomGroup, objGroup, fxGroup);
+scene.add(roomGroup, objGroup, fxGroup, camera);
 function resize(){
   const w = window.innerWidth, h = window.innerHeight;
   renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -442,6 +447,7 @@ let doorHits = [];              // door meshes
 let colliderMeshes = null;      // from a room file's walls-and-floor file
 let splatRoot = null, spark = null, buildToken = 0;
 let slots = [];                 // furniture places that a real model can take over
+let dynProps = [];              // small furnishings that physics may move
 
 function doorPos(room, wall){
   const hw = room.w / 2, hd = room.d / 2;
@@ -756,10 +762,12 @@ async function upgradeFurniture(room, token){
       let x = sl.x, z = sl.z; const off = (i - (n - 1) / 2) * step;
       if(sl.back){ x += sl.back[0] * (sz.z * s / 2 + .02) + (sl.back[0] ? 0 : off); z += sl.back[1] * (sz.z * s / 2 + .02) + (sl.back[1] ? 0 : off); } else x += off;
       c.position.set(x, sl.hang ? room.h - sz.y * s : (sl.y || 0), z); roomGroup.add(c); c.updateMatrixWorld(true);
-      if(!sl.hang) c.traverse(m => { if(m.isMesh) pickables.push(m); });
+      const dyn = !sl.hang && !sl.back && (sl.prop || sl.y > 0);
+      if(dyn) dynProps.push(c); else if(!sl.hang) c.traverse(m => { if(m.isMesh) pickables.push(m); });
     }
     hide(sl);
   }
+  physQueue();
 }
 
 function buildDoors(room){
@@ -791,7 +799,7 @@ async function buildRoom(room){
   const token = ++buildToken;
   disposeGroup(roomGroup); disposeGroup(fxGroup);
   if(splatRoot){ scene.remove(splatRoot); splatRoot.traverse(o => o.dispose && o.dispose()); splatRoot = null; }
-  pickables = []; colliders = []; doorHits = []; slots = []; colliderMeshes = null; cur = room;
+  pickables = []; colliders = []; doorHits = []; slots = []; dynProps = []; colliderMeshes = null; cur = room;
   const { w, d, h } = room, T = lookOf(room), isSplat = !!room.splat;
   roomGroup.add(new THREE.HemisphereLight('#fff4e0', '#2a2018', isSplat ? 1.1 : .55 * (T.dim || 1)));
   const hide = isSplat ? { transparent:true, opacity:0, depthWrite:false } : {};
@@ -906,13 +914,13 @@ async function rebuildObjects(){
     const n = await makeObjNode(o); if(token !== objToken) return;
     objNodes.set(o.id, n); objGroup.add(n); applyObjXf(o);
   }
-  showGuide();
+  showGuide(); physQueue();
 }
 function refreshNumbers(){ for(const [id, n] of objNodes){ const old = n.userData.num; const s = numberSprite(locusNo(id)); s.position.copy(old.position); n.remove(old); old.material.map.dispose(); old.material.dispose(); n.add(s); n.userData.num = s; } }
 
 /* ---------- route line ---------- */
 function rebuildRoute(){
-  disposeGroup(fxGroup);
+  disposeGroup(fxGroup); physQueue();
   const mat = new THREE.MeshBasicMaterial({ color:'#5fd0c5', transparent:true, opacity:.85 });
   const pts = [];
   const flat = o => new THREE.Vector3(o.pos[0], .04, o.pos[2]);
@@ -984,10 +992,85 @@ function frame(now){
     }
   }
   camera.position.copy(pos); camera.rotation.set(pitch, yaw, 0);
+  physStep(dt); handsAnim(dt, now);
   const t = now / 1000; for(const m of fxGroup.children) if(m.material) m.material.opacity = .6 + .3 * Math.sin(t * 2.4);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
+
+
+/* ---------- hands and physics: punch or push things and let them fall. Nothing here is saved; Tidy up restores the room. ---------- */
+const phys = { on:false, C:null, world:null, items:[], player:null, last:new THREE.Vector3(), t:0 };
+const hands = new THREE.Group(); hands.visible = false; camera.add(hands);
+const fists = [1, -1].map((sx, i) => {
+  const g = new THREE.Group(), skin = new THREE.MeshStandardMaterial({ color:'#d9a47c', roughness:.75, depthTest:false }), cuff = new THREE.MeshStandardMaterial({ color:'#2d3a38', roughness:.9, depthTest:false });
+  const arm = new THREE.Mesh(new THREE.CylinderGeometry(.045, .06, .42, 12), cuff); arm.rotation.x = Math.PI / 2 - .25; arm.position.set(0, -.06, .2); arm.renderOrder = 990;
+  const wrist = new THREE.Mesh(new THREE.CylinderGeometry(.04, .045, .1, 12), skin); wrist.rotation.x = Math.PI / 2 - .25; wrist.position.set(0, .005, -.03); wrist.renderOrder = 991;
+  const fist = new THREE.Mesh(new THREE.SphereGeometry(.058, 16, 12), skin); fist.scale.set(1.05, .9, 1.1); fist.position.set(0, .02, -.1); fist.renderOrder = 992;
+  const kn = new THREE.Group(); for(let k = 0; k < 4; k++){ const b = new THREE.Mesh(new THREE.SphereGeometry(.019, 10, 8), skin); b.position.set((k - 1.5) * .027, .05, -.145); b.renderOrder = 993; kn.add(b); }
+  const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(.016, .045, 4, 8), skin); thumb.rotation.z = Math.PI / 2; thumb.position.set(-sx * .012, -.012, -.158); thumb.renderOrder = 994;
+  g.add(arm, wrist, fist, kn, thumb); g.userData = { home:new THREE.Vector3(sx * .25, -.27, -.5), t:1, power:0 }; g.position.copy(g.userData.home); g.rotation.y = sx * .12; hands.add(g); return g;
+});
+hands.add(new THREE.PointLight('#fff1dc', .35, 2));
+let nextFist = 0;
+function meshBox(root){ const b = new THREE.Box3(); root.updateMatrixWorld(true); root.traverse(m => { if(m.isMesh && m.visible !== false && !m.userData.noPhys) b.expandByObject(m); }); return b; }
+let physT = 0; function physQueue(){ if(!phys.on) return; clearTimeout(physT); physT = setTimeout(physBuild, 350); }
+function physTidy(){ for(const it of phys.items){ it.node.position.copy(it.home.p); it.node.quaternion.copy(it.home.q); if(it.shadow) it.shadow.visible = true; } }
+function physBuild(){
+  if(!phys.on || !phys.C || !cur) return; const C = phys.C; physTidy();
+  const w = new C.World({ gravity:new C.Vec3(0, -9.82, 0) }); w.allowSleep = true; w.defaultContactMaterial.friction = .55; w.defaultContactMaterial.restitution = .12; phys.world = w; phys.items = [];
+  const dynBoxes = [];
+  const addDyn = (node, target, shadow) => {
+    const sp = node.position.clone(), sq = node.quaternion.clone(); node.position.set(0, 0, 0); node.quaternion.identity(); const b = meshBox(target);
+    node.position.copy(sp); node.quaternion.copy(sq); node.updateMatrixWorld(true); if(b.isEmpty()) return;
+    const sz = b.getSize(new THREE.Vector3()), cl = b.getCenter(new THREE.Vector3()), mass = Math.min(40, Math.max(.3, sz.x * sz.y * sz.z * 250));
+    const body = new C.Body({ mass, shape:new C.Box(new C.Vec3(Math.max(sz.x / 2, .02), Math.max(sz.y / 2, .02), Math.max(sz.z / 2, .02))), linearDamping:.05, angularDamping:.3 });
+    const wc = cl.clone().applyQuaternion(sq).add(sp); body.position.set(wc.x, wc.y, wc.z); body.quaternion.set(sq.x, sq.y, sq.z, sq.w); body.allowSleep = true; body.sleepSpeedLimit = .2; body.sleepTimeLimit = .5; w.addBody(body); body.sleep();
+    const it = { node, body, cl, home:{ p:sp, q:sq }, shadow }; node.userData.physItem = it; phys.items.push(it); dynBoxes.push(meshBox(target));
+  };
+  for(const [id, n] of objNodes){ const sh = n.children.find(c => c.isMesh && c !== n.userData.model); if(sh) sh.userData.noPhys = true; addDyn(n, n.userData.model, sh); }
+  for(const c of dynProps) if(c.parent) addDyn(c, c);
+  const stat = (min, max) => { const hx = (max.x - min.x) / 2, hy = (max.y - min.y) / 2, hz = (max.z - min.z) / 2; if(hx < .005 || hy < .005 || hz < .005) return; const b = new C.Body({ mass:0, shape:new C.Box(new C.Vec3(hx, hy, hz)) }); b.position.set(min.x + hx, min.y + hy, min.z + hz); w.addBody(b); };
+  const { w:rw, d:rd, h:rh } = cur, T = 1;
+  stat(new THREE.Vector3(-rw, -T, -rd), new THREE.Vector3(rw, 0, rd)); stat(new THREE.Vector3(-rw, rh, -rd), new THREE.Vector3(rw, rh + T, rd));
+  if(!colliderMeshes){ stat(new THREE.Vector3(-rw / 2 - T, 0, -rd), new THREE.Vector3(-rw / 2, rh, rd)); stat(new THREE.Vector3(rw / 2, 0, -rd), new THREE.Vector3(rw / 2 + T, rh, rd)); stat(new THREE.Vector3(-rw, 0, -rd / 2 - T), new THREE.Vector3(rw, rh, -rd / 2)); stat(new THREE.Vector3(-rw, 0, rd / 2), new THREE.Vector3(rw, rh, rd / 2 + T)); }
+  let count = 0;
+  for(const m of pickables){ if(count > 500) break; if(!m.isMesh || m.visible === false || (m.geometry && m.geometry.type === 'PlaneGeometry')) continue; const b = new THREE.Box3().setFromObject(m); if(b.isEmpty()) continue;
+    for(const db of dynBoxes){ if(db.max.x < b.min.x || db.min.x > b.max.x || db.max.z < b.min.z || db.min.z > b.max.z) continue; if(db.min.y > b.min.y + .04 && db.min.y < b.max.y) b.max.y = db.min.y; }
+    stat(b.min, b.max); count++; }
+  phys.player = new C.Body({ mass:0, type:C.Body.KINEMATIC, shape:new C.Sphere(.3) }); phys.player.position.set(pos.x, pos.y - .7, pos.z); w.addBody(phys.player); phys.last.copy(pos);
+}
+function physStep(dt){
+  if(!phys.on || !phys.world) return; const pb = phys.player;
+  pb.velocity.set((pos.x - phys.last.x) / dt, 0, (pos.z - phys.last.z) / dt); pb.position.set(pos.x, pos.y - .7, pos.z); phys.last.copy(pos);
+  phys.world.step(1 / 60, dt, 3);
+  for(const it of phys.items){ const b = it.body; if(b.sleepState === 2 && !it.dirty) continue; it.dirty = b.sleepState !== 2;
+    it.node.quaternion.set(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w); const off = it.cl.clone().applyQuaternion(it.node.quaternion); it.node.position.set(b.position.x - off.x, b.position.y - off.y, b.position.z - off.z);
+    if(it.shadow && it.shadow.visible) it.shadow.visible = false; }
+}
+function handsAnim(dt, now){
+  if(!hands.visible) return;
+  fists.forEach((g, i) => { const u = g.userData; if(u.t < 1){ u.t = Math.min(1, u.t + dt / (u.power > 1 ? .26 : .5)); const k = Math.sin(u.t * Math.PI), reach = u.power > 1 ? .42 : .3; g.position.set(u.home.x * (1 - k * .75), u.home.y + k * .12, u.home.z - k * reach); }
+    else g.position.set(u.home.x, u.home.y + Math.sin(now / 900 + i) * .008, u.home.z); });
+}
+function strike(power){
+  if(!phys.on) return; const g = fists[nextFist]; nextFist = 1 - nextFist; g.userData.t = 0; g.userData.power = power === 'punch' ? 2 : 1;
+  setTimeout(() => {
+    if(!phys.world) return; const C = phys.C, dir = camera.getWorldDirection(new THREE.Vector3()); ray.camera = camera; ray.far = 3; ray.set(camera.getWorldPosition(new THREE.Vector3()), dir);
+    const hits = ray.intersectObjects(phys.items.map(it => it.node), true); ray.far = Infinity;
+    const hit = hits.find(h => h.object.isMesh && h.object.visible !== false && !h.object.userData.noPhys); if(!hit || hit.distance > 2.2) return;
+    let n = hit.object; while(n && !n.userData.physItem) n = n.parent; if(!n) return; const it = n.userData.physItem, m = it.body.mass, J = power === 'punch' ? Math.min(m * 7, 70) : Math.min(m * 1.8, 14);
+    it.body.wakeUp(); it.body.applyImpulse(new C.Vec3(dir.x * J, (dir.y + (power === 'punch' ? .3 : .08)) * J, dir.z * J), new C.Vec3(hit.point.x - it.body.position.x, hit.point.y - it.body.position.y, hit.point.z - it.body.position.z));
+  }, power === 'punch' ? 90 : 180);
+}
+async function handsToggle(){
+  if(phys.on){ phys.on = false; physTidy(); phys.items = []; phys.world = null; hands.visible = false; $('handBar').classList.remove('show'); $('bHands').classList.remove('on'); return; }
+  $('bHands').disabled = true;
+  try{ if(!phys.C) phys.C = await import('cannon-es'); }catch(e){ console.warn(e); toast('The physics part could not load. Check your connection and try again.', 4500); $('bHands').disabled = false; return; }
+  $('bHands').disabled = false; phys.on = true; hands.visible = true; $('handBar').classList.add('show'); $('bHands').classList.add('on'); physBuild();
+  toast(matchMedia('(pointer:coarse)').matches ? 'Look at something close and tap Punch or Push. Tidy up puts everything back.' : 'Look at something close. F punches, T pushes gently. Walking into things nudges them. Tidy up puts everything back.', 6500);
+}
+$('bHands').onclick = handsToggle; $('hPunch').onclick = () => strike('punch'); $('hPush').onclick = () => strike('push'); $('hTidy').onclick = () => { physBuild(); toast('Everything is back in place.'); };
 
 /* ---------- room switching ---------- */
 let switching = false;
@@ -1051,7 +1134,7 @@ function placeAt(o, hit){
   }
   applyObjXf(o); showGuide();
 }
-function nudge(fn){ const o = sel && objById(sel); if(!o) return; fn(o); applyObjXf(o); rebuildRoute(); save(); if(mapOpen()) drawMap(); }
+function nudge(fn){ const o = sel && objById(sel); if(!o) return; if(phys.on) physTidy(); fn(o); applyObjXf(o); rebuildRoute(); save(); if(mapOpen()) drawMap(); }
 
 /* ---------- loci navigation ---------- */
 let curLocus = -1; const tour = { on:false, t:0 };
@@ -1106,6 +1189,7 @@ window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase(); keys.add(k);
   if(k === 'escape'){ if(placing){ placing = false; renderCard(); } else closeCard(); }
   if(k === 'n' || k === ']') goLocus(curLocus + 1); if(k === 'p' || k === '[') goLocus(curLocus - 1);
+  if(k === 'f') strike('punch'); if(k === 't') strike('push');
   if(k === 'm') togglePanel('mapPanel'); if(k === '/'){ e.preventDefault(); togglePanel('findPanel', true); }
   if(k.startsWith('arrow') || k === ' ') e.preventDefault();
 });
@@ -1401,7 +1485,7 @@ if(matchMedia('(pointer:coarse)').matches) $('hintText').textContent = 'Drag to 
 renderCount();
 buildRoom(P.rooms[0]).then(() => { pos.set(1.2, EYE, Math.min(P.rooms[0].d / 2 - .8, 2.6)); yaw = .25; pitch = -.08; clampToRoom(pos); });
 requestAnimationFrame(frame);
-window.__mpb = { get P(){ return P; }, pos, goLocus, enterRoom, get cur(){ return cur; }, click };
+window.__mpb = { get P(){ return P; }, pos, goLocus, enterRoom, get cur(){ return cur; }, click, phys, strike, setView(y, p){ yaw = y; pitch = p; } };
 </script>
 </body>
 </html>
