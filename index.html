@@ -133,7 +133,7 @@ a{color:var(--brass)}
   </div>
 </div>
 
-<div id="hint" class="glass"><span id="hintText">Drag to look around. Walk with W A S D or the arrow keys. Click the floor to glide there.</span><button id="hintOk">Got it</button></div>
+<div id="hint" class="glass"><span id="hintText">Drag to look around. Walk with W A S D or the arrow keys. Click the floor to glide there. F punches what you are looking at, T pushes it.</span><button id="hintOk">Got it</button></div>
 
 <div id="card" class="glass" aria-live="polite">
   <div class="head"><div class="num" id="cardNum">1</div><div id="cardDesc"></div><button id="cardClose" aria-label="Close">✕</button></div>
@@ -1009,7 +1009,7 @@ const fists = [1, -1].map((sx, i) => {
   const fist = new THREE.Mesh(new THREE.SphereGeometry(.058, 16, 12), skin); fist.scale.set(1.05, .9, 1.1); fist.position.set(0, .02, -.1); fist.renderOrder = 992;
   const kn = new THREE.Group(); for(let k = 0; k < 4; k++){ const b = new THREE.Mesh(new THREE.SphereGeometry(.019, 10, 8), skin); b.position.set((k - 1.5) * .027, .05, -.145); b.renderOrder = 993; kn.add(b); }
   const thumb = new THREE.Mesh(new THREE.CapsuleGeometry(.016, .045, 4, 8), skin); thumb.rotation.z = Math.PI / 2; thumb.position.set(-sx * .012, -.012, -.158); thumb.renderOrder = 994;
-  g.add(arm, wrist, fist, kn, thumb); g.userData = { home:new THREE.Vector3(sx * .25, -.27, -.5), t:1, power:0 }; g.position.copy(g.userData.home); g.rotation.y = sx * .12; hands.add(g); return g;
+  g.add(arm, wrist, fist, kn, thumb); g.userData = { home:new THREE.Vector3(sx * .27, -.2, -.5), t:1, power:0 }; g.position.copy(g.userData.home); g.rotation.y = sx * .12; hands.add(g); return g;
 });
 hands.add(new THREE.PointLight('#fff1dc', .35, 2));
 let nextFist = 0;
@@ -1063,14 +1063,14 @@ function strike(power){
     it.body.wakeUp(); it.body.applyImpulse(new C.Vec3(dir.x * J, (dir.y + (power === 'punch' ? .3 : .08)) * J, dir.z * J), new C.Vec3(hit.point.x - it.body.position.x, hit.point.y - it.body.position.y, hit.point.z - it.body.position.z));
   }, power === 'punch' ? 90 : 180);
 }
-async function handsToggle(){
-  if(phys.on){ phys.on = false; physTidy(); phys.items = []; phys.world = null; hands.visible = false; $('handBar').classList.remove('show'); $('bHands').classList.remove('on'); return; }
+async function handsToggle(quiet){
+  if(phys.on){ P.hands = false; save(); phys.on = false; physTidy(); phys.items = []; phys.world = null; hands.visible = false; $('handBar').classList.remove('show'); $('bHands').classList.remove('on'); return; }
   $('bHands').disabled = true;
   try{ if(!phys.C) phys.C = await import('cannon-es'); }catch(e){ console.warn(e); toast('The physics part could not load. Check your connection and try again.', 4500); $('bHands').disabled = false; return; }
-  $('bHands').disabled = false; phys.on = true; hands.visible = true; $('handBar').classList.add('show'); $('bHands').classList.add('on'); physBuild();
-  toast(matchMedia('(pointer:coarse)').matches ? 'Look at something close and tap Punch or Push. Tidy up puts everything back.' : 'Look at something close. F punches, T pushes gently. Walking into things nudges them. Tidy up puts everything back.', 6500);
+  $('bHands').disabled = false; phys.on = true; if(quiet !== true){ P.hands = true; save(); } hands.visible = true; $('handBar').classList.add('show'); $('bHands').classList.add('on'); physBuild();
+  if(quiet !== true) toast(matchMedia('(pointer:coarse)').matches ? 'Look at something close and tap Punch or Push. Tidy up puts everything back.' : 'Look at something close. F punches, T pushes gently. Walking into things nudges them. Tidy up puts everything back.', 6500);
 }
-$('bHands').onclick = handsToggle; $('hPunch').onclick = () => strike('punch'); $('hPush').onclick = () => strike('push'); $('hTidy').onclick = () => { physBuild(); toast('Everything is back in place.'); };
+$('bHands').onclick = () => handsToggle(); $('hPunch').onclick = () => strike('punch'); $('hPush').onclick = () => strike('push'); $('hTidy').onclick = () => { physBuild(); toast('Everything is back in place.'); };
 
 /* ---------- room switching ---------- */
 let switching = false;
@@ -1483,7 +1483,7 @@ if(matchMedia('(pointer:coarse)').matches) $('hintText').textContent = 'Drag to 
 
 /* ---------- start ---------- */
 renderCount();
-buildRoom(P.rooms[0]).then(() => { pos.set(1.2, EYE, Math.min(P.rooms[0].d / 2 - .8, 2.6)); yaw = .25; pitch = -.08; clampToRoom(pos); });
+buildRoom(P.rooms[0]).then(() => { pos.set(1.2, EYE, Math.min(P.rooms[0].d / 2 - .8, 2.6)); yaw = .25; pitch = -.08; clampToRoom(pos); if(P.hands !== false) handsToggle(true); });
 requestAnimationFrame(frame);
 window.__mpb = { get P(){ return P; }, pos, goLocus, enterRoom, get cur(){ return cur; }, click, phys, strike, setView(y, p){ yaw = y; pitch = p; } };
 </script>
